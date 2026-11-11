@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "origin": "documented-expectation",
+  "scope": "Abstract policy decision fixtures; no HTTP or reference-server execution is implied.",
+  "sources": [
+    "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition_operators.html",
+    "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-logic-multiple-context-keys-or-values.html",
+    "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-single-vs-multi-valued-context-keys.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/tagging-and-policies.html"
+  ],
+  "normalization": "None. Context absence, empty strings, empty sets, case and individual set members are retained.",
+  "cases": [
+    {
+      "name": "positive missing",
+      "operator": "StringEquals",
+      "key": "s3:prefix",
+      "policy_values": ["album/", "public/"],
+      "actual": null,
+      "expected": "ImplicitDeny"
+    },
+    {
+      "name": "positive empty is a value",
+      "operator": "StringEquals",
+      "key": "s3:prefix",
+      "policy_values": "",
+      "actual": [""],
+      "expected": "Allow"
+    },
+    {
+      "name": "positive values are OR",
+      "operator": "StringEquals",
+      "key": "s3:prefix",
+      "policy_values": ["album/", "public/"],
+      "actual": ["public/"],
+      "expected": "Allow"
+    },
+    {
+      "name": "negative values are NOR",
+      "operator": "StringNotEquals",
+      "key": "s3:prefix",
+      "policy_values": ["album/", "public/"],
+      "actual": ["public/"],
+      "expected": "ImplicitDeny"
+    },
+    {
+      "name": "negative missing",
+      "operator": "StringNotEquals",
+      "key": "s3:prefix",
+      "policy_values": ["album/", "public/"],
+      "actual": null,
+      "expected": "Allow"
+    },
+    {
+      "name": "ifexists missing",
+      "operator": "StringEqualsIfExists",
+      "key": "s3:prefix",
+      "policy_values": "album/",
+      "actual": null,
+      "expected": "Allow"
+    },
+    {
+      "name": "null missing",
+      "operator": "Null",
+      "key": "s3:prefix",
+      "policy_values": true,
+      "actual": null,
+      "expected": "Allow"
+    },
+    {
+      "name": "boolean creation",
+      "operator": "Bool",
+      "key": "s3:ObjectCreationOperation",
+      "policy_values": true,
+      "actual": ["true"],
+      "expected": "Allow"
+    },
+    {
+      "name": "boolean mismatch",
+      "operator": "Bool",
+      "key": "s3:ObjectCreationOperation",
+      "policy_values": true,
+      "actual": ["false"],
+      "expected": "ImplicitDeny"
+    },
+    {
+      "name": "all missing is vacuous",
+      "operator": "ForAllValues:StringEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["project", "visibility"],
+      "actual": null,
+      "expected": "Allow"
+    },
+    {
+      "name": "all empty is vacuous",
+      "operator": "ForAllValues:StringEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["project", "visibility"],
+      "actual": [],
+      "expected": "Allow"
+    },
+    {
+      "name": "all checks every member",
+      "operator": "ForAllValues:StringEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["project"],
+      "actual": ["project", "visibility"],
+      "expected": "ImplicitDeny"
+    },
+    {
+      "name": "any does not enforce whitelist",
+      "operator": "ForAnyValue:StringEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["project"],
+      "actual": ["project", "visibility"],
+      "expected": "Allow"
+    },
+    {
+      "name": "any missing is false",
+      "operator": "ForAnyValue:StringEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["project"],
+      "actual": null,
+      "expected": "ImplicitDeny"
+    },
+    {
+      "name": "any empty is false",
+      "operator": "ForAnyValue:StringEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["project"],
+      "actual": [],
+      "expected": "ImplicitDeny"
+    },
+    {
+      "name": "all negative per member",
+      "operator": "ForAllValues:StringNotEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["secret"],
+      "actual": ["project", "secret"],
+      "expected": "ImplicitDeny"
+    },
+    {
+      "name": "any negative per member",
+      "operator": "ForAnyValue:StringNotEquals",
+      "key": "s3:RequestObjectTagKeys",
+      "policy_values": ["secret"],
+      "actual": ["project", "secret"],
+      "expected": "Allow"
+    },
+    {
+      "name": "tag value case remains literal",
+      "operator": "StringEquals",
+      "key": "s3:ExistingObjectTag/visibility",
+      "policy_values": "public",
+      "actual": ["Public"],
+      "expected": "ImplicitDeny"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+Initialize or reopen storage and ensure buckets exist
+
+Usage: mikrio init [OPTIONS] <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --json             Emit schema 1 JSON results and diagnostics
+      --region <REGION>  Signing region (mikrio_region; persisted value or us-east-1)
+      --bucket <NAME>    Ensure this bucket exists; repeatable, preserves existing configuration
+  -h, --help             Print help

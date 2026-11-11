@@ -1,0 +1,152 @@
+{
+  "format_version": 1,
+  "schema_sha256": "b370f8968190ef2fdcf6d611c7c1558f12b55ad126faf5e2f7cc19cf6d058aab",
+  "tables": {
+    "store_metadata": [
+      "singleton_id",
+      "store_id",
+      "owner_account_id",
+      "canonical_owner_id",
+      "format_version",
+      "region",
+      "shard_count",
+      "shard_algorithm",
+      "continuation_token_key",
+      "created_at_ms"
+    ],
+    "principals": [
+      "principal_id",
+      "name",
+      "policy_generation",
+      "is_enabled",
+      "policy_json",
+      "created_at_ms"
+    ],
+    "access_keys": [
+      "access_key_id",
+      "principal_id",
+      "secret_access_key",
+      "created_at_ms"
+    ],
+    "buckets": [
+      "bucket_id",
+      "name",
+      "lifecycle_generation",
+      "policy_generation",
+      "block_public_acls",
+      "ignore_public_acls",
+      "block_public_policy",
+      "restrict_public_buckets",
+      "cors_rules_json",
+      "policy_json",
+      "created_at_ms"
+    ],
+    "bucket_lifecycle_rules": [
+      "bucket_id",
+      "rule_index",
+      "rule_id",
+      "is_enabled",
+      "filter_kind",
+      "filter_prefix",
+      "expiration_days",
+      "abort_incomplete_multipart_days"
+    ],
+    "blobs": [
+      "row_id",
+      "blob_id",
+      "shard",
+      "state",
+      "write_kind",
+      "target_bucket_id",
+      "target_key",
+      "target_upload_id",
+      "target_part_number",
+      "byte_length",
+      "part_count",
+      "etag",
+      "md5_digest",
+      "checksum_type",
+      "checksums_json",
+      "created_at_ms",
+      "gc_pending",
+      "gc_retry_at_ms",
+      "gc_attempt_count",
+      "gc_error_code"
+    ],
+    "blob_parts": [
+      "blob_id",
+      "part_number",
+      "part_index",
+      "byte_offset",
+      "byte_length",
+      "checksums_json"
+    ],
+    "objects": [
+      "row_id",
+      "bucket_id",
+      "key",
+      "generation",
+      "blob_id",
+      "content_type",
+      "content_encoding",
+      "content_disposition",
+      "content_language",
+      "cache_control",
+      "expires_at_ms",
+      "user_metadata_json",
+      "tags_json",
+      "last_modified_at_ms",
+      "lifecycle_anchor_at_ms"
+    ],
+    "multipart_uploads": [
+      "row_id",
+      "upload_id",
+      "bucket_id",
+      "key",
+      "initiator_id",
+      "state",
+      "completion_claim_id",
+      "completion_blob_id",
+      "completion_parts_digest",
+      "checksum_algorithm",
+      "checksum_type",
+      "content_type",
+      "content_encoding",
+      "content_disposition",
+      "content_language",
+      "cache_control",
+      "expires_at_ms",
+      "user_metadata_json",
+      "tags_json",
+      "initiated_at_ms"
+    ],
+    "multipart_parts": [
+      "upload_id",
+      "part_number",
+      "generation",
+      "blob_id",
+      "last_modified_at_ms"
+    ],
+    "multipart_receipts": [
+      "row_id",
+      "upload_id",
+      "bucket_id",
+      "key",
+      "outcome",
+      "completion_claim_id",
+      "completion_blob_id",
+      "completion_parts_digest",
+      "result_json",
+      "finished_at_ms"
+    ],
+    "maintenance_sweeps": [
+      "task",
+      "shard",
+      "generation",
+      "cursor_row_id",
+      "upper_row_id",
+      "started_at_ms"
+    ]
+  },
+  "listing_query": "SELECT o.key, o.blob_id, b.blob_id AS stored_blob_id,\n       b.state AS blob_state, b.byte_length, b.etag, o.last_modified_at_ms,\n       b.md5_digest, b.part_count, b.shard\nFROM objects AS o\nLEFT JOIN blobs AS b ON b.blob_id = o.blob_id\nWHERE o.bucket_id = :bucket_id\n  AND o.key >= :prefix_lower\n  AND o.key < :prefix_upper\n  AND o.key > :after_key\nORDER BY o.key\nLIMIT :page_limit;"
+}

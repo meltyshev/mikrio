@@ -1,0 +1,22 @@
+packages: []
+
+minimumReleaseAge: 4320
+minimumReleaseAgeIgnoreMissingTime: false
+minimumReleaseAgeStrict: true
+ignoreScripts: true
+allowBuilds: {}
+permissions: {}
+cargo:
+  enabled: false
+strictDepBuilds: true
+strictPeerDependencies: true
+blockExoticSubdeps: true
+pmOnFail: error
+runtimeOnFail: error
+storeDir: .cache/pnpm-store
+cacheDir: .cache/pnpm-cache
+updateNotifier: false
+lockfileIncludeTarballUrl: true
+registry: https://registry.npmjs.org/
+trustPolicy: no-downgrade
+saveExact: true

@@ -1,0 +1,11 @@
+Create an enabled principal with no policy or keys
+
+Usage: mikrio principal create [OPTIONS] --name <NAME> <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --json         Emit schema 1 JSON results and diagnostics
+      --name <NAME>  Unique application identity name
+  -h, --help         Print help

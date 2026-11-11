@@ -1,0 +1,42 @@
+[package]
+name = "mikrio-core"
+version.workspace = true
+description = "Storage engine for mikrio"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64-simd.workspace = true
+crc-fast.workspace = true
+getrandom.workspace = true
+hmac.workspace = true
+md-5.workspace = true
+regex.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[dev-dependencies]
+rusqlite = { workspace = true, features = ["hooks"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+libc.workspace = true
+
+[build-dependencies]
+mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+
+[lints]
+workspace = true

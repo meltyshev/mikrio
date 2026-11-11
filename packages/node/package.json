@@ -1,0 +1,49 @@
+{
+  "name": "mikrio",
+  "version": "0.1.0",
+  "description": "Embedded object storage with an S3-compatible HTTP interface",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/meltyshev/mikrio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/meltyshev/mikrio.git",
+    "directory": "packages/node"
+  },
+  "bugs": {
+    "url": "https://github.com/meltyshev/mikrio/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_LICENSES.txt"
+  ],
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "@mikrio/node-darwin-arm64": "0.1.0",
+    "@mikrio/node-darwin-x64": "0.1.0",
+    "@mikrio/node-linux-arm64-gnu": "0.1.0",
+    "@mikrio/node-linux-x64-gnu": "0.1.0",
+    "@mikrio/node-win32-x64-msvc": "0.1.0"
+  }
+}

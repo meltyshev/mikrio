@@ -1,0 +1,54 @@
+{
+  "provenance": "Primary AWS documentation plus explicitly local compatibility rules. No live AWS execution.",
+  "sources": [
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity-upload.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPartCopy.html"
+  ],
+  "negotiation": [
+    {
+      "algorithm": null,
+      "type": null,
+      "selected_algorithm": "CRC64NVME",
+      "selected_type": "FULL_OBJECT"
+    },
+    {
+      "algorithm": "CRC32",
+      "type": null,
+      "selected_algorithm": "CRC32",
+      "selected_type": "COMPOSITE"
+    },
+    {
+      "algorithm": "CRC32C",
+      "type": null,
+      "selected_algorithm": "CRC32C",
+      "selected_type": "COMPOSITE"
+    },
+    {
+      "algorithm": "SHA1",
+      "type": null,
+      "selected_algorithm": "SHA1",
+      "selected_type": "COMPOSITE"
+    },
+    {
+      "algorithm": "SHA256",
+      "type": null,
+      "selected_algorithm": "SHA256",
+      "selected_type": "COMPOSITE"
+    },
+    {
+      "algorithm": "CRC64NVME",
+      "type": null,
+      "selected_algorithm": "CRC64NVME",
+      "selected_type": "FULL_OBJECT"
+    }
+  ],
+  "local_rules": {
+    "defaulted_part_integrity": "Verify request algorithm independently; persist and return immutable CRC64NVME part digest. Never infer initiation from first part. Explicit upload mismatches fail.",
+    "ranged_source_minimum_exclusive": 5242880,
+    "range_qualification": "Binary threshold and exact error projection provisional; primary source only says 5 MB.",
+    "copy_tags_with_copy_directive": "Reject supplied tags; REPLACE omission means empty.",
+    "self_copy": "Metadata REPLACE required.",
+    "completion": "Do not ignore legacy supplied checksum assertions. Initiation tags require no extra completion tag grant."
+  }
+}

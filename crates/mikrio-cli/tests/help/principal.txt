@@ -1,0 +1,16 @@
+Administer persistent application identities in an existing store
+
+Usage: mikrio principal [OPTIONS] <COMMAND>
+
+Commands:
+  create   Create an enabled principal with no policy or keys
+  get      Read one principal
+  list     Read one bounded principal page
+  enable   Enable the principal's current credentials
+  disable  Disable authentication; preserve policy and keys
+  delete   Delete a principal after explicitly revoking all its keys
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+      --json  Emit schema 1 JSON results and diagnostics
+  -h, --help  Print help

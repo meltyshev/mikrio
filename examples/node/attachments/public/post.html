@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reusable POST demonstration</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/post.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <h1>Reusable POST demonstration</h1>
+      <p><a href="/">Sign in to the attachment app</a>, then return here.</p>
+      <p>
+        This separate private bucket holds temporary demonstration files. A form
+        can replace its object repeatedly until it expires. Files are never
+        attached to an application record.
+      </p>
+      <form id="issue">
+        <label for="status">Success response</label>
+        <select id="status">
+          <option>201</option>
+          <option>200</option>
+          <option>204</option>
+          <option value="303">303 redirect to this page</option>
+        </select>
+        <button>Issue a form</button>
+      </form>
+      <form id="upload">
+        <label for="file">File (up to 1 MiB; declared text/plain)</label>
+        <input id="file" type="file" required />
+        <button id="send" disabled>Upload or replay this form</button>
+      </form>
+      <p>
+        The same form and key are reused when you choose another file. A browser
+        response, redirect, or CORS failure may happen after publication; use
+        readback to check the object.
+      </p>
+      <button id="read" disabled>Read current object</button>
+      <button id="delete" disabled>Delete current object</button>
+      <p>
+        Deletion does not revoke the form. Recurring cleanup removes expired
+        demo objects and discovers later writes. This page makes no promise of
+        final absence.
+      </p>
+      <p id="result" role="status" aria-live="polite"></p>
+    </main>
+  </body>
+</html>

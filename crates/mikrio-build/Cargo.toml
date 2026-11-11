@@ -1,0 +1,17 @@
+[package]
+name = "mikrio-build"
+version.workspace = true
+description = "Internal native loader policy for mikrio artifacts"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+# Loader policy is exercised by relocated native and packaged Rust consumers.
+test = false
+doctest = false
+
+[lints]
+workspace = true

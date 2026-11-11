@@ -1,0 +1,43 @@
+[package]
+name = "mikrio-python"
+version.workspace = true
+description = "Native Python binding for mikrio"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+# This extension is exercised through installed Python, not a Rust test binary.
+test = false
+doctest = false
+
+[[example]]
+name = "python_diagnostics_probe"
+path = "examples/diagnostics_probe.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "python_stream_probe"
+path = "examples/stream_probe.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+mikrio = { version = "=0.1.0", path = "../mikrio" }
+mikrio-embed = { version = "=0.1.0", path = "../mikrio-embed" }
+pyo3.workspace = true
+
+[dev-dependencies]
+bytes.workspace = true
+mikrio-core = { version = "=0.1.0", path = "../mikrio-core" }
+tokio.workspace = true
+
+[build-dependencies]
+mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+
+[lints]
+workspace = true

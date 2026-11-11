@@ -1,0 +1,46 @@
+[package]
+name = "s3s-multipart"
+version = "0.17.0"
+description = "Async streaming parser for multipart/form-data"
+readme = "../../README.md"
+keywords = ["multipart", "form-data", "parser", "streaming"]
+categories = ["web-programming", "asynchronous"]
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints]
+workspace = true
+
+[dependencies]
+arrayvec.workspace = true
+bytes.workspace = true
+futures-core.workspace = true
+httparse.workspace = true
+memchr.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+futures = { workspace = true, features = ["executor"] }
+futures-util.workspace = true
+mimalloc.workspace = true
+multer.workspace = true
+rand.workspace = true
+
+[[bench]]
+name = "parse_throughput"
+harness = false
+
+[[bench]]
+name = "take_data_stream"
+harness = false
+
+[[bench]]
+name = "vs_multer"
+harness = false

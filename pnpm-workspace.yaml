@@ -1,0 +1,37 @@
+packages:
+  - examples/node/attachments
+  - packages/node
+
+# Native archives are built separately. Source tooling needs only the wrapper.
+ignoredOptionalDependencies:
+  - "@mikrio/node-darwin-arm64"
+  - "@mikrio/node-darwin-x64"
+  - "@mikrio/node-linux-arm64-gnu"
+  - "@mikrio/node-linux-x64-gnu"
+  - "@mikrio/node-win32-x64-msvc"
+
+# The three lint consumers use the retained match/Minimatch API. Remove this
+# security override when their declared ranges select the reviewed fixed line.
+overrides:
+  "minimatch@10.2.6": "11.0.5"
+
+minimumReleaseAge: 4320
+minimumReleaseAgeIgnoreMissingTime: false
+minimumReleaseAgeStrict: true
+ignoreScripts: true
+allowBuilds: {}
+permissions: {}
+cargo:
+  enabled: false
+strictDepBuilds: true
+strictPeerDependencies: true
+blockExoticSubdeps: true
+pmOnFail: error
+runtimeOnFail: error
+storeDir: .cache/pnpm-store
+cacheDir: .cache/pnpm-cache
+updateNotifier: false
+lockfileIncludeTarballUrl: true
+registry: https://registry.npmjs.org/
+trustPolicy: no-downgrade
+saveExact: true

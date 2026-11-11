@@ -1,0 +1,39 @@
+[package]
+name = "mikrio-cli"
+version.workspace = true
+description = "Command-line interface for mikrio object storage"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "mikrio"
+path = "src/main.rs"
+doc = false
+
+[dependencies]
+clap.workspace = true
+mikrio = { version = "=0.1.0", path = "../mikrio" }
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "signal"] }
+tracing.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true, features = ["event"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+[dev-dependencies]
+hmac.workspace = true
+sha2.workspace = true
+
+[build-dependencies]
+mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+
+[lints]
+workspace = true

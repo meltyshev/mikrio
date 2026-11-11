@@ -1,0 +1,15 @@
+Atomically replace one complete policy
+
+Usage: mikrio policy apply [OPTIONS] --file <PATH> <--bucket <NAME>|--principal-id <ID>> <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --bucket <NAME>      Bucket policy target
+      --json               Emit schema 1 JSON results and diagnostics
+      --principal-id <ID>  Identity policy target
+      --file <PATH>        UTF-8 policy file; - explicitly reads stdin (maximum 20 KiB)
+  -h, --help               Print help
+
+Use --file=PATH for a leading-hyphen filename, or --file ./- for a literal file named -. Validation preserves the previous policy on rejection. Block Public Access remains enforced.

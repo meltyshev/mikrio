@@ -1,0 +1,66 @@
+{
+  "origin": "Independent Python hashlib/zlib and bitwise CRC recurrence; not an AWS capture or the Rust checksum implementation.",
+  "sources": [
+    "https://reveng.sourceforge.io/crc-catalogue/all.htm",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity-upload.html"
+  ],
+  "vectors": [
+    {
+      "body_hex": "",
+      "checksums": {
+        "CRC32": "AAAAAA==",
+        "CRC32C": "AAAAAA==",
+        "CRC64NVME": "AAAAAAAAAAA=",
+        "SHA1": "2jmj7l5rSw0yVb/vlWAYkK/YBwk=",
+        "SHA256": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
+      }
+    },
+    {
+      "body_hex": "313233343536373839",
+      "checksums": {
+        "CRC32": "y/Q5Jg==",
+        "CRC32C": "4waSgw==",
+        "CRC64NVME": "rosUhgp5mIg=",
+        "SHA1": "98O8HYCOBHMq32eZZczDTKeuNEE=",
+        "SHA256": "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="
+      }
+    },
+    {
+      "body_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "checksums": {
+        "CRC32": "KQWMcw==",
+        "CRC32C": "nEQYSw==",
+        "CRC64NVME": "/3HiEnnZlm4=",
+        "SHA1": "SRbWvbf3jmgDaYyrMtFYbqRX38g=",
+        "SHA256": "QK/y6dLYki5Hr9RkjmlnSXFYeF+9Hahw5xECZr+USIA="
+      }
+    },
+    {
+      "body_hex": "66697273740070617274",
+      "checksums": {
+        "CRC32": "BL6X6A==",
+        "CRC32C": "pMx5Pg==",
+        "CRC64NVME": "O2xFUC1rBjs=",
+        "SHA1": "2IbBQVPoKLDvsePJQW2Eor3cBzM=",
+        "SHA256": "MOwgCBrLJ8rEMipRrT+VD/NJC/XhdcVJX3YJn0LOwFE="
+      }
+    },
+    {
+      "body_hex": "7365636f6e64ff70617274",
+      "checksums": {
+        "CRC32": "vW9X/g==",
+        "CRC32C": "GMiFTA==",
+        "CRC64NVME": "AmWgrfYIk1M=",
+        "SHA1": "OaEEYQqfgj94W3lotYAxNOwV574=",
+        "SHA256": "tpLMEUoZxBkUxYp7mP+w/aTpeKb5KUdoorwN9hp9VYU="
+      }
+    }
+  ],
+  "composite_parts_hex": ["66697273740070617274", "7365636f6e64ff70617274"],
+  "composite": {
+    "CRC32": "iolBWQ==-2",
+    "CRC32C": "NICIDw==-2",
+    "SHA1": "XZegUnfm5svBnTXvP/RfUUGgtzA=-2",
+    "SHA256": "3hTWaGX4Yek0FZlLABU6gih5wfC6WBFrIYCxE2WiLy4=-2"
+  }
+}

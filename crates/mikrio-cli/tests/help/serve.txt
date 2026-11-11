@@ -1,0 +1,17 @@
+Serve a foreground S3 listener until shutdown
+
+Usage: mikrio serve [OPTIONS] <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --json                      Emit schema 1 JSON results and diagnostics
+      --region <REGION>           Signing region (mikrio_region; persisted value or us-east-1)
+      --bucket <NAME>             Ensure this bucket exists; repeatable, preserves existing configuration
+      --host <IP>                 Bind IP (mikrio_host; default 127.0.0.1)
+      --port <PORT>               Bind port, 0-65535 (mikrio_port; default 0)
+      --public-endpoint <ORIGIN>  HTTP(S) response origin (mikrio_public_endpoint)
+  -h, --help                      Print help
+
+Credentials: set both mikrio_access_key_id and mikrio_secret_access_key, or omit both to generate temporary owner credentials. AWS settings are ignored. Generated readiness credentials are sensitive. SIGINT/SIGTERM (Windows Ctrl+C) close the listener and store.

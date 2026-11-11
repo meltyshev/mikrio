@@ -1,0 +1,22 @@
+[package]
+name = "mikrio-ffi"
+version.workspace = true
+description = "C interface for mikrio object storage"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mikrio = { version = "=0.1.0", path = "../mikrio", default-features = false, features = ["http"] }
+mikrio-embed = { version = "=0.1.0", path = "../mikrio-embed" }
+
+[build-dependencies]
+mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+
+[lints]
+workspace = true

@@ -1,0 +1,110 @@
+[workspace]
+members = [
+    "crates/mikrio",
+    "crates/mikrio-build",
+    "crates/mikrio-cli",
+    "crates/mikrio-core",
+    "crates/mikrio-embed",
+    "crates/mikrio-ffi",
+    "crates/mikrio-http",
+    "crates/mikrio-node",
+    "crates/mikrio-python",
+]
+resolver = "3"
+exclude = [
+    "vendor/hyper-1.12.0",
+    "vendor/hyper-util-0.1.21",
+    "vendor/libsqlite3-sys-0.39.1",
+    "vendor/rusqlite-0.41.1",
+    "vendor/s3s-0.17.0",
+    "vendor/s3s-multipart-0.17.0",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "Apache-2.0"
+repository = "https://github.com/meltyshev/mikrio"
+
+[workspace.dependencies]
+async-trait = "=0.1.92"
+base64-simd = { version = "=0.8.0", default-features = false, features = ["detect", "std"] }
+bytes = { version = "=1.12.1", default-features = false, features = ["std"] }
+clap = { version = "=4.6.7", default-features = false, features = ["error-context", "help", "std", "usage"] }
+crc-fast = { version = "=1.10.0", default-features = false, features = ["std"] }
+futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
+getrandom = "=0.4.3"
+hmac = { version = "=0.13.0", default-features = false }
+http = "=1.5.0"
+hyper = { package = "mikrio-hyper", version = "=1.12.0-mikrio.1", path = "vendor/hyper-1.12.0", default-features = false, features = ["http1", "server"] }
+hyper-util = { package = "mikrio-hyper-util", version = "=0.1.21-mikrio.1", path = "vendor/hyper-util-0.1.21", default-features = false, features = ["tokio"] }
+libc = { version = "=0.2.191", default-features = false, features = ["std"] }
+md-5 = { version = "=0.11.0", default-features = false }
+napi = { version = "=3.16.1", default-features = false, features = ["napi8", "tokio_rt"] }
+napi-build = "=2.6.0"
+napi-derive = { version = "=3.7.0", default-features = false, features = ["strict"] }
+pyo3 = { version = "=0.30.1", default-features = false, features = ["abi3-py312", "macros"] }
+regex = { version = "=1.13.1", default-features = false, features = ["std", "unicode-gencat"] }
+rusqlite = { package = "mikrio-rusqlite", version = "=0.41.1-mikrio.1", path = "vendor/rusqlite-0.41.1", default-features = false, features = ["bundled", "cache"] }
+rustix = { version = "=1.1.6", default-features = false, features = ["fs", "std"] }
+s3s = { package = "mikrio-s3s", version = "=0.17.0-mikrio.1", path = "vendor/s3s-0.17.0", default-features = false }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+sha1 = { version = "=0.11.0", default-features = false }
+sha2 = { version = "=0.11.1", default-features = false }
+time = { version = "=0.3.55", default-features = false }
+tokio = { version = "=1.54.1", default-features = false, features = ["rt", "sync", "time"] }
+tracing = { version = "=0.1.44", default-features = false, features = ["std"] }
+urlencoding = { version = "=2.1.3", default-features = false }
+windows-sys = { version = "=0.61.2", default-features = false, features = ["Wdk_Foundation", "Wdk_Storage_FileSystem", "Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO"] }
+
+[profile.release]
+panic = "unwind"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+let_underscore_lock = "deny"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+# Explicit ownership, error, and unsafe boundaries.
+await_holding_lock = "warn"
+await_holding_refcell_ref = "warn"
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"
+allow_attributes_without_reason = "warn"
+let_underscore_future = "warn"
+let_underscore_must_use = "warn"
+mem_forget = "warn"
+clone_on_ref_ptr = "warn"
+
+# Checked conversions and UTF-8 access.
+as_conversions = "warn"
+string_slice = "warn"
+
+# No hidden panics, placeholders, debug output, or host termination.
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+unreachable = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+exit = "warn"
+
+# Meaningful domain names and coherent protocols outrank numeric style caps.
+module_name_repetitions = "allow"
+too_many_lines = "allow"
+too_many_arguments = "allow"

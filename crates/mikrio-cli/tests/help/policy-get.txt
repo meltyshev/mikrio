@@ -1,0 +1,12 @@
+Read the exact stored policy document
+
+Usage: mikrio policy get [OPTIONS] <--bucket <NAME>|--principal-id <ID>> <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --bucket <NAME>      Bucket policy target
+      --json               Emit schema 1 JSON results and diagnostics
+      --principal-id <ID>  Identity policy target
+  -h, --help               Print help

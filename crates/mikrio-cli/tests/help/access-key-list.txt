@@ -1,0 +1,13 @@
+Read one key page without secrets
+
+Usage: mikrio access-key list [OPTIONS] --principal-id <ID> <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --json                        Emit schema 1 JSON results and diagnostics
+      --principal-id <ID>           Stable principal ID, not a name or ARN
+      --max-results <N>             Page size, 1-1000 (default 100)
+      --continuation-token <TOKEN>  Opaque next-page token from the preceding result
+  -h, --help                        Print help

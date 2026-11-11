@@ -1,0 +1,61 @@
+{
+  "origin": "Independent Python hashlib/zlib and bitwise reflected CRC recurrence, crosschecked against the existing 123456789 fixture; not an AWS capture or Rust producer.",
+  "vectors": [
+    {
+      "algorithm": "CRC32",
+      "mode": "FULL_OBJECT",
+      "body": "abc",
+      "etag": "\"af5da9f45af7a300e3aded972f8ff687-1\"",
+      "checksum": "NSRBwg=="
+    },
+    {
+      "algorithm": "CRC32",
+      "mode": "COMPOSITE",
+      "body": "abc",
+      "etag": "\"af5da9f45af7a300e3aded972f8ff687-1\"",
+      "checksum": "Rf3kaw==-1"
+    },
+    {
+      "algorithm": "CRC32C",
+      "mode": "FULL_OBJECT",
+      "body": "abc",
+      "etag": "\"af5da9f45af7a300e3aded972f8ff687-1\"",
+      "checksum": "Nks/tw=="
+    },
+    {
+      "algorithm": "CRC32C",
+      "mode": "COMPOSITE",
+      "body": "abc",
+      "etag": "\"af5da9f45af7a300e3aded972f8ff687-1\"",
+      "checksum": "ZpGMMA==-1"
+    },
+    {
+      "algorithm": "CRC64NVME",
+      "mode": "FULL_OBJECT",
+      "body": "abc",
+      "etag": "\"af5da9f45af7a300e3aded972f8ff687-1\"",
+      "checksum": "BeXKuz/B+us="
+    },
+    {
+      "algorithm": "SHA1",
+      "mode": "COMPOSITE",
+      "body": "abc",
+      "etag": "\"af5da9f45af7a300e3aded972f8ff687-1\"",
+      "checksum": "DTztm+wQp3euwjzMNTqMCKYzBF4=-1"
+    },
+    {
+      "algorithm": "SHA256",
+      "mode": "COMPOSITE",
+      "body": "abc",
+      "etag": "\"af5da9f45af7a300e3aded972f8ff687-1\"",
+      "checksum": "T4tCwi3TcptRm6b2jS2nzFstYG0F2u1a1RKMwD5sY1g=-1"
+    },
+    {
+      "algorithm": "CRC64NVME",
+      "mode": "FULL_OBJECT",
+      "body": "",
+      "etag": "\"59adb24ef3cdbe0297f05b395827453f-1\"",
+      "checksum": "AAAAAAAAAAA="
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+Delete a principal after explicitly revoking all its keys
+
+Usage: mikrio principal delete [OPTIONS] --principal-id <ID> <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --json               Emit schema 1 JSON results and diagnostics
+      --principal-id <ID>  Stable principal ID, not a name or ARN
+  -h, --help               Print help

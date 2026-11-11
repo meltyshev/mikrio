@@ -1,0 +1,28 @@
+[package]
+name = "mikrio"
+version.workspace = true
+description = "Embedded object storage with an S3-compatible HTTP interface"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["http"]
+http = ["dep:mikrio-http"]
+
+[dependencies]
+mikrio-core = { version = "=0.1.0", path = "../mikrio-core" }
+mikrio-http = { version = "=0.1.0", path = "../mikrio-http", optional = true }
+tokio = { workspace = true, features = ["io-util"] }
+
+[dev-dependencies]
+sha2.workspace = true
+tokio.workspace = true
+
+[build-dependencies]
+mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+
+[lints]
+workspace = true

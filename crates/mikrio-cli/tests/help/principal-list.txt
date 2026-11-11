@@ -1,0 +1,12 @@
+Read one bounded principal page
+
+Usage: mikrio principal list [OPTIONS] <DIR>
+
+Arguments:
+  <DIR>  Managed store directory
+
+Options:
+      --json                        Emit schema 1 JSON results and diagnostics
+      --max-results <N>             Page size, 1-1000 (default 100)
+      --continuation-token <TOKEN>  Opaque next-page token from the preceding result
+  -h, --help                        Print help

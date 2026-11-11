@@ -1,0 +1,38 @@
+#[derive(Default)]
+pub struct UploadPartCopyOutput {
+    /// <p>Indicates whether the multipart upload uses an S3 Bucket Key for server-side encryption with
+    /// Key Management Service (KMS) keys (SSE-KMS).</p>
+    pub bucket_key_enabled: Option<BucketKeyEnabled>,
+    /// <p>Container for all response elements.</p>
+    pub copy_part_result: Option<CopyPartResult>,
+    /// <p>The version of the source object that was copied, if you have enabled versioning on the source
+    /// bucket.</p>
+    /// <note>
+    /// <p>This functionality is not supported when the source object is in a directory bucket.</p>
+    /// </note>
+    pub copy_source_version_id: Option<CopySourceVersionId>,
+    pub request_charged: Option<RequestCharged>,
+    /// <p>If server-side encryption with a customer-provided encryption key was requested, the response will
+    /// include this header to confirm the encryption algorithm that's used.</p>
+    /// <note>
+    /// <p>This functionality is not supported for directory buckets.</p>
+    /// </note>
+    pub sse_customer_algorithm: Option<SSECustomerAlgorithm>,
+    /// <p>If server-side encryption with a customer-provided encryption key was requested, the response will
+    /// include this header to provide the round-trip message integrity verification of the customer-provided
+    /// encryption key.</p>
+    /// <note>
+    /// <p>This functionality is not supported for directory buckets.</p>
+    /// </note>
+    pub sse_customer_key_md5: Option<SSECustomerKeyMD5>,
+    /// <p>If present, indicates the ID of the KMS key that was used for object encryption.</p>
+    pub ssekms_key_id: Option<SSEKMSKeyId>,
+    /// <p>The server-side encryption algorithm used when you store this object in Amazon S3 or Amazon FSx.</p>
+    /// <note>
+    /// <p>When accessing data stored in Amazon FSx file systems using S3 access points, the only valid server side
+    /// encryption option is <code>aws:fsx</code>.</p>
+    /// </note>
+    pub server_side_encryption: Option<ServerSideEncryption>,
+    /// Long-running copy; the final XML result alone acknowledges publication.
+    pub future: Option<BoxFuture<'static, S3Result<UploadPartCopyOutput>>>,
+}

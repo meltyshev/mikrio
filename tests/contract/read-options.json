@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "provenance": {
+    "origin": "documentation and independent source inspection; not a live AWS, Ceph or MinIO capture",
+    "references": [
+      {
+        "url": "https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html",
+        "use": "Single-range GET and signed response overrides; conditional evaluation precedes body selection."
+      },
+      {
+        "url": "https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html",
+        "use": "HEAD has no body; satisfiable range changes length, unsatisfiable range is 416. Local wire fixture uses the documented successful 200 status."
+      },
+      {
+        "url": "https://github.com/ceph/s3-tests/blob/86b4ad895c0f342d0f4d0ddb3b57ecae1d668617/s3tests_boto3/functional/test_s3.py",
+        "use": "test_ranged_request_response_code, test_ranged_request_skip_leading_bytes_response_code, test_ranged_request_return_trailing_bytes_response_code and invalid-range cases: input testcontent, 4-7, 4-, -7, 40-50; expected bytes, Content-Range and GET status."
+      },
+      {
+        "url": "https://raw.githubusercontent.com/minio/minio/RELEASE.2025-09-07T16-13-09Z/cmd/object-handlers.go",
+        "use": "Independent source omits stored checksums for ranged GET and HEAD; all six response override fields. Its ranged HEAD status is 206, unlike the successful 200 description in AWS HeadObject documentation; local comparator differences are not AWS facts."
+      }
+    ]
+  },
+  "local_rules": {
+    "syntax": "One strict bytes= range; checked u64 endpoints; no whitespace, signs, multiple ranges, reversal or overflow. InvalidArgument for malformed syntax.",
+    "selection": "Authorize and evaluate conditions first; clip the end or suffix to full length; zero suffix and every range on an empty object return InvalidRange.",
+    "projection": "GET 206 and body; HEAD 200 with selected length and Content-Range, no body. Whole-object checksums/type omitted whenever Range is supplied, including a range covering all bytes.",
+    "overrides": "Validate all six using shared representation rules, preserve present empty strings, reject anonymous overrides even for public objects, change detached response only. HTTP dates use whole-second wire precision."
+  },
+  "vectors": [
+    {
+      "input": "bytes=4-7",
+      "content_range": "bytes 4-7/11",
+      "body": "cont"
+    },
+    {
+      "input": "bytes=4-",
+      "content_range": "bytes 4-10/11",
+      "body": "content"
+    },
+    {
+      "input": "bytes=-7",
+      "content_range": "bytes 4-10/11",
+      "body": "content"
+    },
+    {
+      "input": "bytes=40-50",
+      "error": "InvalidRange"
+    }
+  ],
+  "limitations": [
+    "Exact HEAD status, header presence and empty suffix behavior have not been compared against live AWS.",
+    "These vectors cover ranges and response overrides, not completed-part selection or combined Range/partNumber requests."
+  ]
+}

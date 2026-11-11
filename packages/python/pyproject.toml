@@ -1,0 +1,59 @@
+[build-system]
+requires = ["maturin==1.16.0"]
+build-backend = "maturin"
+
+[project]
+name = "mikrio"
+dynamic = ["version"]
+description = "Embedded object storage with an S3-compatible HTTP interface"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+
+[project.urls]
+Homepage = "https://github.com/meltyshev/mikrio#readme"
+Repository = "https://github.com/meltyshev/mikrio"
+Issues = "https://github.com/meltyshev/mikrio/issues"
+
+[dependency-groups]
+build = ["maturin==1.16.0"]
+dev = [
+    "mypy==2.4.1",
+    "pip-audit==2.10.1",
+    "pytest==9.2.0",
+    "ruff==0.17.4",
+]
+
+[tool.maturin]
+manifest-path = "../../crates/mikrio-python/Cargo.toml"
+python-source = "."
+module-name = "mikrio._native"
+bindings = "pyo3"
+# Keep the process-wide SQLite loader identity. Automatic repair may rename it.
+auditwheel = "skip"
+include = [
+    # maturin's GlobPattern schema uses an underscore for this field.
+    { path = "libmikrio_sqlite3.dylib", from = "out-dir", to = "mikrio/", crate_name = "mikrio-libsqlite3-sys" },
+    { path = "libmikrio_sqlite3.so", from = "out-dir", to = "mikrio/", crate_name = "mikrio-libsqlite3-sys" },
+    { path = "mikrio_sqlite3.dll", from = "out-dir", to = "mikrio/", crate_name = "mikrio-libsqlite3-sys" },
+]
+
+[tool.maturin.sbom]
+# The automatic path-based SBOM exposes local build directories.
+rust = false
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.uv]
+required-version = "==0.13.7"
+exclude-newer = "3 days"
+# GHSA-6q48-6c7w-9gw2; prevent resolution back to the vulnerable release.
+constraint-dependencies = ["certifi>=2026.10.19"]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true

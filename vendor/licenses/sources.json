@@ -1,0 +1,62 @@
+{
+  "napi-build@2.6.0": {
+    "path": "vendor/licenses/napi-a94cef33f62e74682963dd085e283f52dcec2600.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/a94cef33f62e74682963dd085e283f52dcec2600/LICENSE"
+  },
+  "base64-simd@0.8.0": {
+    "path": "vendor/licenses/simd-d74c030d9dc4f3cae02146d1f497ff62726ef09a.txt",
+    "sha256": "71674605ec4c087fe9eb534e3e4f9e26eb2e4aabcd76a29fd156c6a844d44b3d",
+    "source": "https://raw.githubusercontent.com/Nugine/simd/d74c030d9dc4f3cae02146d1f497ff62726ef09a/LICENSE"
+  },
+  "hex-simd@0.8.0": {
+    "path": "vendor/licenses/simd-d74c030d9dc4f3cae02146d1f497ff62726ef09a.txt",
+    "sha256": "71674605ec4c087fe9eb534e3e4f9e26eb2e4aabcd76a29fd156c6a844d44b3d",
+    "source": "https://raw.githubusercontent.com/Nugine/simd/d74c030d9dc4f3cae02146d1f497ff62726ef09a/LICENSE"
+  },
+  "vsimd@0.8.0": {
+    "path": "vendor/licenses/simd-d74c030d9dc4f3cae02146d1f497ff62726ef09a.txt",
+    "sha256": "71674605ec4c087fe9eb534e3e4f9e26eb2e4aabcd76a29fd156c6a844d44b3d",
+    "source": "https://raw.githubusercontent.com/Nugine/simd/d74c030d9dc4f3cae02146d1f497ff62726ef09a/LICENSE"
+  },
+  "s3s-rfc2047@0.17.0": {
+    "path": "vendor/licenses/s3s-b21ba206155fcf9697bca977297ae6bc6c7b6445.txt",
+    "sha256": "8928038540ab604c7abb495dd00816ad4727535a1b549908354380f51d540b2a",
+    "source": "https://raw.githubusercontent.com/Nugine/s3s/b21ba206155fcf9697bca977297ae6bc6c7b6445/LICENSE"
+  },
+  "napi@3.15.0": {
+    "path": "vendor/licenses/napi-d9cb526c15e63ba30e06b4d169068c9854180595.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/d9cb526c15e63ba30e06b4d169068c9854180595/LICENSE"
+  },
+  "napi-derive@3.6.13": {
+    "path": "vendor/licenses/napi-d9cb526c15e63ba30e06b4d169068c9854180595.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/d9cb526c15e63ba30e06b4d169068c9854180595/LICENSE"
+  },
+  "napi-derive-backend@6.1.6": {
+    "path": "vendor/licenses/napi-d9cb526c15e63ba30e06b4d169068c9854180595.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/d9cb526c15e63ba30e06b4d169068c9854180595/LICENSE"
+  },
+  "napi-sys@3.4.1": {
+    "path": "vendor/licenses/napi-d9cb526c15e63ba30e06b4d169068c9854180595.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/d9cb526c15e63ba30e06b4d169068c9854180595/LICENSE"
+  },
+  "napi@3.16.1": {
+    "path": "vendor/licenses/napi-417375ad5ef1d8cb4c49edf13d2cc6c0204bb5b1.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/417375ad5ef1d8cb4c49edf13d2cc6c0204bb5b1/LICENSE"
+  },
+  "napi-derive@3.7.0": {
+    "path": "vendor/licenses/napi-f89400d99b136c5c8a27818654b91256832b5bd6.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/f89400d99b136c5c8a27818654b91256832b5bd6/LICENSE"
+  },
+  "napi-derive-backend@7.0.0": {
+    "path": "vendor/licenses/napi-f89400d99b136c5c8a27818654b91256832b5bd6.txt",
+    "sha256": "3f1ce66533302df3a32edbfdfc0b78f0dd34659e4c1f5817162e5ea3c2297215",
+    "source": "https://raw.githubusercontent.com/napi-rs/napi-rs/f89400d99b136c5c8a27818654b91256832b5bd6/LICENSE"
+  }
+}

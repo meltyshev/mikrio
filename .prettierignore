@@ -1,0 +1,12 @@
+# Build output
+artifacts/
+dist/
+packages/node/test-dist/
+target/
+
+# Dependencies and caches
+.cache/
+node_modules/
+
+# Generated lockfiles
+pnpm-lock.yaml

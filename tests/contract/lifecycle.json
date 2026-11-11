@@ -1,0 +1,66 @@
+{
+  "scope": "Object expiration from independently attributed fixtures; incomplete-upload abort uses separately labeled local rules. Arithmetic does not grant cleanup authority.",
+  "sources": [
+    {
+      "url": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html",
+      "kind": "AWS published example"
+    },
+    {
+      "url": "https://github.com/minio/minio/blob/01447d2438c46cb4658c1e5a13f21f56b7f05a92/internal/bucket/lifecycle/lifecycle_test.go",
+      "case": "TestExpectedExpiryTime",
+      "kind": "independent source fixtures; not executed upstream"
+    }
+  ],
+  "object_expiration": [
+    {
+      "case": "aws-published-example",
+      "anchor": "2014-01-15T10:30:00+00:00",
+      "anchor_ms": 1389781800000,
+      "days": 3,
+      "expected": "2014-01-19T00:00:00+00:00",
+      "expected_ms": 1390089600000
+    },
+    {
+      "case": "independent-afternoon",
+      "anchor": "2020-03-15T10:10:10+00:00",
+      "anchor_ms": 1584267010000,
+      "days": 4,
+      "expected": "2020-03-20T00:00:00+00:00",
+      "expected_ms": 1584662400000
+    },
+    {
+      "case": "independent-exact-midnight",
+      "anchor": "2020-03-15T00:00:00+00:00",
+      "anchor_ms": 1584230400000,
+      "days": 1,
+      "expected": "2020-03-17T00:00:00+00:00",
+      "expected_ms": 1584403200000
+    }
+  ],
+  "abort_incomplete_multipart": [
+    {
+      "kind": "local compatibility rule; no AWS observation",
+      "anchor": "2026-10-23T23:59:59.999+00:00",
+      "anchor_ms": 1792799999999,
+      "days": 1,
+      "expected": "2026-10-25T00:00:00+00:00",
+      "expected_ms": 1792886400000
+    },
+    {
+      "kind": "local compatibility rule; no AWS observation",
+      "anchor": "2026-10-24T00:00:00+00:00",
+      "anchor_ms": 1792800000000,
+      "days": 1,
+      "expected": "2026-10-26T00:00:00+00:00",
+      "expected_ms": 1792972800000
+    },
+    {
+      "kind": "local compatibility rule; no AWS observation",
+      "anchor": "2026-10-24T00:00:00.001+00:00",
+      "anchor_ms": 1792800000001,
+      "days": 1,
+      "expected": "2026-10-26T00:00:00+00:00",
+      "expected_ms": 1792972800000
+    }
+  ]
+}

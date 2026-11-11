@@ -1,0 +1,62 @@
+{
+  "origin": "AWS-document-derived expectations and the selected shared character subset; not an AWS capture",
+  "sources": [
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingMetadata.html",
+    "https://s3.amazonaws.com/doc/s3-developer-guide/RESTObjectPUT.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-files-posix-permissions.html"
+  ],
+  "valid_keys": [
+    "a",
+    "a/b",
+    "a/../b",
+    "a//../b/",
+    "./a",
+    "/a",
+    "/",
+    ".",
+    "é",
+    "é",
+    "a%2Fb",
+    "a+b",
+    "a\u0000b"
+  ],
+  "invalid_keys": ["../b", "a/../../b", "/../b", "./../b", "a//../../b"],
+  "valid_buckets": ["photos", "my.bucket-123", "012", "123.456.789.012"],
+  "invalid_buckets": [
+    "",
+    "ab",
+    "Photos",
+    "a..b",
+    "a_b",
+    "-photos",
+    "photos-",
+    "192.168.1.1",
+    "001.002.003.004",
+    "xn--photos",
+    "sthree-photos",
+    "amzn-s3-demo-photos",
+    "photos-s3alias",
+    "photos--ol-s3",
+    "photos.mrap",
+    "photos--x-s3",
+    "photos--table-s3",
+    "photos-an"
+  ],
+  "metadata": [
+    ["TITLE", "café"],
+    ["empty", ""],
+    ["Quoted", "a\"b\\c"]
+  ],
+  "stored_metadata": "{\"empty\":\"\",\"quoted\":\"a\\\"b\\\\c\",\"title\":\"café\"}",
+  "content_type_provenance": "Absent default is AWS-document-derived; explicit empty preservation is the selected native contract. SeaweedFS comparison uses application/octet-stream for both absent and empty, so it is not the oracle for either case.",
+  "content_types": [
+    { "input": null, "effective": "binary/octet-stream" },
+    { "input": "", "effective": "" },
+    {
+      "input": "application/x-mikrio-fixture",
+      "effective": "application/x-mikrio-fixture"
+    }
+  ]
+}

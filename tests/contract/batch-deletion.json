@@ -1,0 +1,24 @@
+{
+  "provenance": "Official operation and conditional-delete documentation; retained independent Python hashlib/zlib and SigV4 producers. Source/model evidence and local execution do not establish live AWS equivalence.",
+  "sources": [
+    "https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-deletes.html",
+    "https://docs.aws.amazon.com/sdkref/latest/guide/feature-dataintegrity.html"
+  ],
+  "cases": {
+    "bounds": "1 through 1000 entries; empty and over-limit whole requests fail before mutation",
+    "duplicates": "Evaluate separately in original input order; later entries observe prior committed effects",
+    "etag": "XML supports ordinary bare or quoted validators, normalized to the native quoted entity tag; star denotes existence; weak/list/malformed native validators rejected",
+    "authorization": "DeleteObject on each entry; a concrete validator additionally requires GetObject; a star alone does not",
+    "quiet": "Suppress only normal Deleted entries; preserve Error entries and all native interruption positions",
+    "integrity": "Verify complete bounded XML, terminal framing, and every digest before any entry; accept Content-MD5 or a supported flexible checksum for ordinary SDK defaults",
+    "normal": "200 may contain both Deleted and Error; no batch-wide atomicity",
+    "unknown": "Stop further dispatch; native indexed Unknown aggregate; HTTP whole-request error without a rollback assertion",
+    "envelope": "8 MiB decoded XML only for DeleteObjects; other XML retains 64 KiB; both declared and actual lengths are bounded"
+  },
+  "limitations": [
+    "AWS conditional-delete documentation does not establish one error code for all missing/concurrent cases. Local missing conditional entries return NoSuchKey; this has not been compared against live AWS.",
+    "The DeleteObjects operation page says Content-MD5 is required for general-purpose buckets, while selected modern SDKs use flexible checksums. Local SDK tests accept their supported digest defaults; this broader allowance is not a live AWS observation.",
+    "Current missing HTTP bucket privacy follows the shared authority lookup, not a new batch-specific existence disclosure."
+  ]
+}

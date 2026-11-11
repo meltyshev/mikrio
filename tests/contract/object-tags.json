@@ -1,0 +1,79 @@
+{
+  "origin": "Independently authored expectations from the AWS object-tagging limits and S3Tag character pattern; not an AWS capture",
+  "sources": [
+    "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-tagging.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_S3Tag.html",
+    "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/custom-tags.html"
+  ],
+  "valid": [
+    [
+      "Name",
+      "Case retained"
+    ],
+    [
+      "name",
+      ""
+    ],
+    [
+      "日本語",
+      "é"
+    ],
+    [
+      "𐐀",
+      "𝟘"
+    ],
+    [
+      "punctuation_.:/=+-@",
+      "_.:/=+-@"
+    ],
+    [
+      " space ",
+      "    "
+    ],
+    [
+      "ordinal",
+      "Ⅳ²"
+    ],
+    [
+      "value-prefix",
+      "aws:ordinary-value"
+    ],
+    [
+      "aws",
+      "no-colon"
+    ],
+    [
+      "prefix-aws:key",
+      "not-reserved"
+    ]
+  ],
+  "invalid_keys": [
+    "",
+    "aws:",
+    "aws:service",
+    "control\n",
+    "é",
+    "emoji😀",
+    "quote\"",
+    "escape\\",
+    "format​",
+    "markͅ"
+  ],
+  "invalid_values": [
+    "\t",
+    "\r",
+    "\n",
+    "\u0000",
+    "",
+    "é",
+    "ͅ",
+    "‍",
+    "😀",
+    "&",
+    "%",
+    "?"
+  ],
+  "stored": "{\"Name\":\"\",\"name\":\"É\",\"é\":\"日本語\",\"𐐀\":\"Ⅳ\"}",
+  "limitations": "AWS's reserved-prefix case sensitivity and IAM tag condition-key suffix collisions have not been established by operation-specific live comparisons.",
+  "compatibility": "Reject ASCII case variants of aws: in both new input and stored tags, match ASCII policy suffixes case-insensitively and deny ambiguous case-colliding authorization. These local rules have not been established by live AWS observations."
+}

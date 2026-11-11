@@ -1,0 +1,39 @@
+[
+  {
+    "matrix": "macos-arm64",
+    "name": "@mikrio/node-darwin-arm64",
+    "os": "darwin",
+    "cpu": "arm64",
+    "runtime": "libmikrio_sqlite3.dylib"
+  },
+  {
+    "matrix": "macos-x86_64",
+    "name": "@mikrio/node-darwin-x64",
+    "os": "darwin",
+    "cpu": "x64",
+    "runtime": "libmikrio_sqlite3.dylib"
+  },
+  {
+    "matrix": "linux-arm64",
+    "name": "@mikrio/node-linux-arm64-gnu",
+    "os": "linux",
+    "cpu": "arm64",
+    "libc": "glibc",
+    "runtime": "libmikrio_sqlite3.so"
+  },
+  {
+    "matrix": "linux-x86_64",
+    "name": "@mikrio/node-linux-x64-gnu",
+    "os": "linux",
+    "cpu": "x64",
+    "libc": "glibc",
+    "runtime": "libmikrio_sqlite3.so"
+  },
+  {
+    "matrix": "windows-x86_64",
+    "name": "@mikrio/node-win32-x64-msvc",
+    "os": "win32",
+    "cpu": "x64",
+    "runtime": "mikrio_sqlite3.dll"
+  }
+]

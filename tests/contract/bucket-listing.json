@@ -1,0 +1,21 @@
+{
+  "provenance": "Official operation documentation and the pinned s3s 0.17.0 Bucket/ListBuckets DTO documentation; no live AWS capture.",
+  "sources": [
+    "https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBuckets.html",
+    "https://docs.aws.amazon.com/AmazonS3/latest/API/API_Bucket.html"
+  ],
+  "wire_cases": {
+    "no_options": "Complete result; no continuation, Prefix or BucketRegion",
+    "any_option": "Paginated; omitted max-buckets defaults to 10000; explicit range 1 through 10000",
+    "prefix_presence": "Echo supplied prefix, including an empty prefix",
+    "continuation": "ContinuationToken only when more matching buckets remain; no IsTruncated",
+    "region": "Must match the regional endpoint; local mismatch uses InvalidArgument",
+    "owner": "Canonical ID; no synthetic display name"
+  },
+  "local_choices": [
+    "No AWS account quota is imposed on the local unpaginated operation.",
+    "Tokens are operation/store/filter-bound and are not AWS tokens.",
+    "Native calls always use bounded pages, defaulting to 1000.",
+    "Unpaginated HTTP owns linear metadata/XML buffers and releases SQL before network writes."
+  ]
+}

@@ -1,0 +1,20 @@
+[package]
+name = "mikrio-embed"
+version.workspace = true
+description = "Foreign-runtime support for mikrio bindings"
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bytes.workspace = true
+mikrio = { version = "=0.1.0", path = "../mikrio", default-features = false }
+tokio.workspace = true
+
+[build-dependencies]
+mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+
+[lints]
+workspace = true

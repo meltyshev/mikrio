@@ -1,0 +1,262 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  dependencies:
+    name: Audit dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        run: rustup show
+
+      - name: Verify Rust dependency release ages
+        run: python3 -m tools.dependencies
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.0
+          package-manager-cache: false
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: 0.13.7
+          python-version: 3.14.10
+          enable-cache: false
+
+      - name: Set up pnpm
+        run: |
+          npm install --global --ignore-scripts pnpm@12.18.0
+          # Activate the native binary with pnpm's reviewed setup hook.
+          node "$(npm root --global)/pnpm/install.js"
+
+      - name: Set up cargo-deny
+        run: |
+          archive="$RUNNER_TEMP/cargo-deny.tar.gz"
+          curl --fail --location --output "$archive" \
+            https://github.com/EmbarkStudios/cargo-deny/releases/download/0.20.2/cargo-deny-0.20.2-x86_64-unknown-linux-musl.tar.gz
+          echo "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f  $archive" | sha256sum --check --strict
+          tar --extract --gzip --file "$archive" --directory "$RUNNER_TEMP"
+
+      - name: Audit Rust dependencies with cargo-deny
+        run: '"$RUNNER_TEMP/cargo-deny-0.20.2-x86_64-unknown-linux-musl/cargo-deny" --locked check'
+
+      - name: Audit Node.js dependencies with pnpm
+        run: |
+          pnpm audit
+          pnpm --dir tests/sdk/node audit
+
+      - name: Install Python dependencies
+        run: uv sync --project packages/python --locked --group build --no-install-project --no-build
+
+      - name: Audit Python dependencies with pip-audit
+        run: |
+          for project in packages/python tests/sdk/python; do
+            uv export --project "$project" --locked --all-groups --no-emit-project \
+              --output-file "$RUNNER_TEMP/python-requirements.txt" > /dev/null
+            uv run --project packages/python --no-sync python -m pip_audit \
+              --strict --require-hashes --disable-pip --progress-spinner off \
+              --requirement "$RUNNER_TEMP/python-requirements.txt"
+          done
+
+  test:
+    name: Check and test (${{ matrix.runner }})
+    needs: dependencies
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04-arm, macos-15]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      GOPROXY: https://proxy.golang.org
+      GOTOOLCHAIN: local
+      PYO3_BUILD_EXTENSION_MODULE: "1"
+      RUSTDOCFLAGS: "-D warnings"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        run: rustup show
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.0
+          package-manager-cache: false
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: 0.13.7
+          python-version: 3.14.10
+          enable-cache: false
+
+      - name: Set up pnpm
+        run: |
+          npm install --global --ignore-scripts pnpm@12.18.0
+          # Activate the native binary with pnpm's reviewed setup hook.
+          node "$(npm root --global)/pnpm/install.js"
+
+      - name: Check package versions
+        run: python3 -m tools.version check
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: tests/sdk/go/go.mod
+          cache: false
+
+      - name: Install Node.js dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir tests/sdk/node install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: |
+          uv sync --project packages/python --locked --group build --no-install-project --no-build
+          uv sync --project tests/sdk/python --locked --no-install-project --no-build
+          echo "PYO3_PYTHON=$(uv python find)" >> "$GITHUB_ENV"
+
+      - name: Check Rust formatting with rustfmt
+        run: cargo fmt -- --check
+
+      - name: Lint Rust with Clippy
+        run: |
+          cargo clippy --workspace --locked --all-targets -- -D warnings
+          cargo clippy -p mikrio --no-default-features --locked --all-targets -- -D warnings
+
+      - name: Test Rust packages
+        run: |
+          cargo test --workspace --locked -- --test-threads=1
+          cargo test -p mikrio --no-default-features --locked -- --test-threads=1
+
+      - name: Build Rust documentation with rustdoc
+        run: |
+          cargo doc -p mikrio --locked --no-deps
+          cargo doc -p mikrio --no-default-features --locked --no-deps
+
+      - name: Lint Python with Ruff
+        run: uv run --project packages/python --no-sync python -m ruff check tools schema packages/python tests
+
+      - name: Check Python formatting with Ruff
+        run: uv run --project packages/python --no-sync python -m ruff format --check tools schema packages/python tests
+
+      - name: Check Python types with mypy
+        run: uv run --project packages/python --no-sync python -m mypy --strict tools schema
+
+      - name: Verify database schema
+        run: python3 schema/verify.py
+
+      - name: Test Python tooling
+        run: python3 -m unittest discover -s tools/tests
+
+      - name: Verify generated S3 code
+        run: python3 -m tools.regenerate_s3s --check
+
+      - name: Verify native license notices
+        run: |
+          for binding in python node cli ffi; do
+            python3 -m tools.native_notices --target supported --binding "$binding" --check
+          done
+
+      - name: Check TypeScript types
+        run: |
+          node node_modules/typescript-compiler/bin/tsc -p packages/node/tsconfig.json
+          node node_modules/typescript-compiler/bin/tsc -p packages/node/tsconfig.test.json --noEmit
+          node node_modules/typescript-compiler/bin/tsc -p examples/node/attachments/tsconfig.json --noEmit
+          node node_modules/typescript-compiler/bin/tsc -p tests/sdk/node/tsconfig.json
+
+      - name: Lint TypeScript with ESLint
+        run: |
+          pnpm exec eslint \
+            packages/node/src packages/node/tests \
+            examples/node/attachments/src examples/node/attachments/tests \
+            tests/sdk/node/src --max-warnings 0
+
+      - name: Check formatting with Prettier
+        run: |
+          pnpm exec prettier --check \
+            '.github/workflows/*.yaml' .github/renovate.json .prettierrc.json \
+            package.json pnpm-workspace.yaml eslint.config.mjs \
+            'packages/*/*.json' 'examples/**/package.json' 'examples/**/tsconfig.json' \
+            'tests/sdk/node/*.json' tests/sdk/node/pnpm-workspace.yaml \
+            packages/node/src packages/node/tests \
+            examples/node/attachments/src examples/node/attachments/tests \
+            tests/sdk/node/src
+
+      - name: Check Markdown formatting with Prettier
+        run: |
+          pnpm exec prettier --check \
+            '*.md' 'docs/**/*.md' 'crates/*/README.md' 'packages/*/README.md' \
+            'examples/**/README.md' 'vendor/**/*.md'
+
+      - name: Test Node.js SDK helpers
+        run: node --test tests/sdk/node/dist/{reporter,request-defaults,transfer-sources}.test.mjs
+
+      - name: Test Python SDK helpers
+        run: |
+          for suite in fixtures http_loss request_defaults transfer_sources; do
+            uv run --project tests/sdk/python --no-sync python -m unittest discover \
+              -s tests/sdk -p "test_$suite.py"
+          done
+
+      - name: Test SDK interoperability
+        run: |
+          for suite in integrity phases storage; do
+            uv run --project tests/sdk/python --no-sync python -m tools.test_sdk "$suite"
+          done
+          uv run --project tests/sdk/python --no-sync python -m tools.test_sdk listener --go go
+
+      - name: Build native distributions
+        run: |
+          python3 -m tools.build cli
+          python3 -m tools.build ffi
+          python3 -m tools.build node
+          uv run --project packages/python --no-sync python -m tools.build python
+
+      - name: Test installed distributions
+        run: |
+          release_version=$(python3 -m tools.version show)
+          uv run --project packages/python --no-sync python -m tools.test_bindings python dist/*.whl
+          native=$(find dist -name "mikrio-node-*-$release_version.tgz")
+          python3 -m tools.test_bindings node "dist/mikrio-$release_version.tgz" --native "$native"
+          python3 -m tools.test_bindings attachments "dist/mikrio-$release_version.tgz" --native "$native"
+          python3 -m tools.test_ffi dist/mikrio-c-*.tar.gz --go go
+
+      - name: Verify clean working tree
+        run: |
+          working_tree_status=$(git status --porcelain)
+          test -z "$working_tree_status"

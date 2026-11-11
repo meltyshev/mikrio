@@ -1,0 +1,19 @@
+{
+  "name": "@mikrio/attachments-example",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Attachment storage example for mikrio",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=26.12.1 <27"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1164.0",
+    "@aws-sdk/s3-presigned-post": "3.1164.0",
+    "@aws-sdk/s3-request-presigner": "3.1164.0"
+  },
+  "devDependencies": {
+    "mikrio": "workspace:*"
+  }
+}

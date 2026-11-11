@@ -1,0 +1,751 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2023-2026 The s3s Authors
+
+//! S3 Service Configuration
+//!
+//! This module provides configurable parameters for the S3 service.
+//!
+//! # Features
+//! - `serde` support for serialization/deserialization
+//! - Default values for all parameters
+//! - Configuration values via [`S3Config`]
+//! - Static configuration via [`StaticConfigProvider`]
+//! - Hot-reload configuration via [`HotReloadConfigProvider`]
+//!
+//! # Example
+//! ```
+//! use std::sync::Arc;
+//! use s3s::config::{S3Config, S3ConfigProvider, StaticConfigProvider, HotReloadConfigProvider};
+//!
+//! // Using default config values
+//! let config = S3Config::default();
+//!
+//! // Using custom config values
+//! let mut config = S3Config::default();
+//! config.xml_max_body_size = 10 * 1024 * 1024;
+//! config.put_object_max_size = Some(5 * 1024 * 1024 * 1024);
+//!
+//! // Using static config provider (immutable)
+//! let static_provider = Arc::new(StaticConfigProvider::new(Arc::new(config.clone())));
+//! let snapshot = static_provider.snapshot();
+//! assert_eq!(snapshot.xml_max_body_size, 10 * 1024 * 1024);
+//! assert_eq!(snapshot.put_object_max_size, Some(5 * 1024 * 1024 * 1024));
+//!
+//! // Using hot-reload config provider (can be updated at runtime)
+//! let hot_reload_provider = Arc::new(HotReloadConfigProvider::default());
+//! let snapshot = hot_reload_provider.snapshot();
+//! assert_eq!(snapshot.xml_max_body_size, 20 * 1024 * 1024);
+//!
+//! // Update configuration at runtime
+//! let mut new_config = S3Config::default();
+//! new_config.xml_max_body_size = 10 * 1024 * 1024;
+//! hot_reload_provider.update(Arc::new(new_config));
+//! assert_eq!(hot_reload_provider.snapshot().xml_max_body_size, 10 * 1024 * 1024);
+//! ```
+
+use std::sync::Arc;
+
+use arc_swap::ArcSwap;
+use serde::{Deserialize, Serialize};
+
+use crate::region::Region;
+
+// AWS-compatible default: https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html#PresignedUrl-Expiration
+pub(crate) const DEFAULT_PRESIGNED_URL_MAX_EXPIRES_SECS: u32 = 7 * 24 * 60 * 60;
+
+/// Default `S3Config::put_object_max_size`: 5 GiB, matching the AWS single-PUT object size limit.
+pub(crate) const DEFAULT_PUT_OBJECT_MAX_SIZE: u64 = 5 * 1024 * 1024 * 1024;
+
+// Aligned with MinIO: https://github.com/minio/minio/blob/master/cmd/streaming-signature-v4.go
+pub(crate) const DEFAULT_AWS_CHUNKED_STREAM_MAX_CHUNK_SIZE: usize = 256 * 1024 * 1024;
+
+const DEFAULT_SIG_V4_ALLOWED_SERVICES: &[&str] = &["s3", "sts"];
+
+fn default_sig_v4_allowed_services() -> Vec<String> {
+    DEFAULT_SIG_V4_ALLOWED_SERVICES.iter().map(ToString::to_string).collect()
+}
+
+fn is_default_sig_v4_allowed_services(services: &[String]) -> bool {
+    services
+        .iter()
+        .map(String::as_str)
+        .eq(DEFAULT_SIG_V4_ALLOWED_SERVICES.iter().copied())
+}
+
+/// S3 Service Configuration Provider trait.
+///
+/// This trait provides a `snapshot` method that returns an `Arc<S3Config>`.
+/// This design allows for faster access and consistent reads across multiple
+/// config values.
+///
+/// Built-in providers:
+/// - [`StaticConfigProvider`] - Immutable configuration (default if not set)
+/// - [`HotReloadConfigProvider`] - Runtime-updatable configuration
+pub trait S3ConfigProvider: Send + Sync + 'static {
+    /// Returns a snapshot of the current configuration.
+    ///
+    /// This operation returns an `Arc<S3Config>` that provides consistent
+    /// access to all configuration values. The snapshot is immutable and will
+    /// not change even if the underlying configuration is updated.
+    fn snapshot(&self) -> Arc<S3Config>;
+}
+
+/// S3 Service Configuration.
+///
+/// Contains configurable parameters for the S3 service with sensible defaults.
+/// The configuration is immutable after creation.
+///
+/// Streaming uploads such as `PUT Object` and `UploadPart` have a default
+/// 5 GiB limit per request. When [`S3Config::put_object_max_size`] is unset,
+/// the [`S3`](crate::S3) implementation is responsible for enforcing
+/// object-size limits for those streams.
+///
+/// Use with [`StaticConfigProvider`] or [`HotReloadConfigProvider`].
+///
+/// # Example
+/// ```
+/// use std::sync::Arc;
+/// use s3s::config::{S3Config, S3ConfigProvider, StaticConfigProvider, HotReloadConfigProvider};
+///
+/// let mut config = S3Config::default();
+/// config.xml_max_body_size = 10 * 1024 * 1024;
+/// config.put_object_max_size = Some(5 * 1024 * 1024 * 1024);
+///
+/// // Wrap in StaticConfigProvider for immutable config
+/// let static_provider = Arc::new(StaticConfigProvider::new(Arc::new(config.clone())));
+/// let snapshot = static_provider.snapshot();
+/// assert_eq!(snapshot.xml_max_body_size, 10 * 1024 * 1024);
+/// assert_eq!(snapshot.put_object_max_size, Some(5 * 1024 * 1024 * 1024));
+///
+/// // Or wrap in HotReloadConfigProvider for runtime updates
+/// let hot_config = Arc::new(HotReloadConfigProvider::new(Arc::new(config)));
+/// let snapshot = hot_config.snapshot();
+/// assert_eq!(snapshot.xml_max_body_size, 10 * 1024 * 1024);
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+#[non_exhaustive]
+#[allow(clippy::struct_excessive_bools)]
+pub struct S3Config {
+    /// Maximum size for XML body payloads in bytes.
+    ///
+    /// This limit prevents unbounded memory allocation for operations that require
+    /// the full body in memory (e.g., XML parsing).
+    ///
+    /// Default: 20 MiB (20 * 1024 * 1024)
+    pub xml_max_body_size: usize,
+
+    /// Maximum file size for POST object in bytes.
+    ///
+    /// S3 has a 5 GiB limit for single PUT object, so this is a reasonable default.
+    ///
+    /// Default: 5 GiB (5 * 1024 * 1024 * 1024)
+    pub post_object_max_file_size: u64,
+
+    /// Optional maximum object size for streaming uploads in bytes.
+    ///
+    /// When set, `s3s` limits decoded streaming request bodies for operations
+    /// such as `PUT Object` and `UploadPart` before passing them to the
+    /// [`S3`](crate::S3) implementation. For aws-chunked requests, signature
+    /// verification installs the decoded stream before this limit is applied.
+    /// Known payload lengths above the limit are rejected with
+    /// [`crate::S3ErrorCode::EntityTooLarge`] before operation dispatch. Bodies
+    /// that exceed the limit while being read return [`crate::BodySizeLimitExceeded`];
+    /// implementations should map this error to `EntityTooLarge`.
+    ///
+    /// The limit applies independently to each request, including each
+    /// `UploadPart`, not to the combined multipart object size. Enforcement
+    /// does not depend on [`S3Config::normalize_content_length`].
+    ///
+    /// When unset, `s3s` does not impose a streaming object-size limit and the
+    /// implementation must enforce any deployment-specific cap.
+    ///
+    /// `POST Object` keeps using [`S3Config::post_object_max_file_size`] as its
+    /// file-size limit.
+    ///
+    /// Default: 5 GiB (5 * 1024 * 1024 * 1024), matching the AWS single-PUT object
+    /// size limit. Set this to `None` explicitly to disable the limit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub put_object_max_size: Option<u64>,
+
+    /// Maximum size for custom-route request bodies in bytes.
+    ///
+    /// Custom routes may read request bodies outside the generated S3 operation
+    /// deserializers. This limit bounds those bodies before route dispatch to
+    /// reduce denial-of-service risk from oversized custom-route payloads.
+    ///
+    /// Set to `None` to disable the limit.
+    ///
+    /// Default: 1 MiB (1024 * 1024)
+    pub custom_route_max_body_size: Option<u64>,
+
+    /// Maximum chunk data size for aws-chunked streaming uploads in bytes.
+    ///
+    /// Signed chunks must be buffered in full before their signature can be verified,
+    /// so this limit bounds the memory retained per chunk. Unsigned chunks are streamed
+    /// without buffering and are not subject to this limit.
+    ///
+    /// Default: 256 MiB (256 * 1024 * 1024)
+    pub aws_chunked_stream_max_chunk_size: usize,
+
+    /// Maximum size per form field in bytes.
+    ///
+    /// This prevents denial-of-service attacks via oversized individual fields.
+    ///
+    /// Default: 1 MiB (1024 * 1024)
+    pub form_max_field_size: usize,
+
+    /// Maximum total size for all form fields combined in bytes.
+    ///
+    /// This prevents denial-of-service attacks via accumulation of many fields.
+    ///
+    /// Default: 20 MiB (20 * 1024 * 1024)
+    pub form_max_fields_size: usize,
+
+    /// Maximum number of parts in multipart form.
+    ///
+    /// This prevents denial-of-service attacks via excessive part count.
+    ///
+    /// Default: 1000
+    pub form_max_parts: usize,
+
+    /// Bound the complete non-file form envelope and stream through ignored
+    /// ordinary trailing fields before successful file EOF.
+    pub form_max_envelope_size: Option<usize>,
+
+    /// Maximum allowed time skew for presigned URLs in seconds.
+    ///
+    /// This allows requests that are up to this many seconds in the future
+    /// to account for clock skew between the client and server.
+    ///
+    /// Default: 900 (15 minutes)
+    pub presigned_url_max_skew_time_secs: u32,
+
+    /// Region accepted in `SigV4` credential scopes.
+    ///
+    /// When set, requests signed for another region are rejected with
+    /// `AuthorizationHeaderMalformed`. When unset, any region is accepted.
+    ///
+    /// Default: None
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expected_region: Option<Region>,
+
+    /// Services accepted in `SigV4` credential scopes.
+    ///
+    /// Requests signed for services outside this list are rejected with
+    /// `NotImplemented`. Add service names here when layering S3-compatible
+    /// extension APIs behind the same authentication path.
+    ///
+    /// Default: `["s3", "sts"]`
+    #[serde(
+        default = "default_sig_v4_allowed_services",
+        skip_serializing_if = "is_default_sig_v4_allowed_services"
+    )]
+    pub sig_v4_allowed_services: Vec<String>,
+
+    /// Verify only the canonical S3 path, without retrying the raw path.
+    #[serde(default)]
+    pub sig_v4_strict_path: bool,
+
+    /// Whether Signature Version 2 (`SigV2`) verification is enabled.
+    ///
+    /// `SigV2` is deprecated by AWS and does not bind the signature to a region
+    /// or service. When disabled, requests carrying a `SigV2` signature (header
+    /// auth, presigned URL, or POST form) are rejected with `AccessDenied`.
+    ///
+    /// Default: false (`SigV2` is disabled by default for security)
+    pub enable_sig_v2: bool,
+
+    /// Maximum allowed `X-Amz-Expires` value for `SigV4` presigned URLs in seconds.
+    ///
+    /// Default: 604800 (7 days, matching AWS S3 behavior)
+    ///
+    /// Values larger than 604800 intentionally diverge from AWS S3 compatibility.
+    pub presigned_url_max_expires_secs: u32,
+
+    /// Whether to normalize forward slashes in object keys.
+    ///
+    /// If enabled, multiple consecutive slashes will be treated as a single slash:
+    ///
+    /// - If the path does not start with `/`, no normalization is performed.
+    /// - If the path starts with `/`, normalization:
+    ///   - removes all leading slashes (unless the entire path is one or more `/`)
+    ///   - replaces consecutive internal slashes with a single slash
+    ///   - reduces one or more trailing slashes to a single trailing slash
+    /// - Examples:
+    ///   - "/"                 -> "/"
+    ///   - "/keyname"          -> "keyname"
+    ///   - "//keyname"         -> "keyname"
+    ///   - "//keyname/"        -> "keyname/"
+    ///   - "//dir////keyname"  -> "dir/keyname"
+    ///   - "dir///sub//file"   -> "dir///sub//file"
+    ///   - "/dir///sub//file"  -> "dir/sub/file"
+    ///
+    /// Default: false
+    pub normalize_forward_slash_path: bool,
+
+    /// Whether to backfill a known request-body length into the
+    /// `Content-Length` header when the client omitted it.
+    ///
+    /// When enabled (default), a `Content-Length` is inserted before the
+    /// [`S3`](crate::S3) implementation observes the request if the body
+    /// length is known: the decoded length established by the aws-chunked
+    /// verifier, or an exact remaining length (e.g. an empty
+    /// body without `Content-Length`, which is empty by definition per
+    /// RFC 9112 Section 6.3). This lets storage implementations obtain the object
+    /// size up front instead of treating `None` as ambiguous. The inserted
+    /// header is visible in [`S3Request`](crate::S3Request) via `headers`,
+    /// so they may not be the exact wire headers.
+    ///
+    /// Requests whose length is unknown (e.g. chunked `Transfer-Encoding`
+    /// without aws-chunked) are never backfilled and keep a missing
+    /// `Content-Length`.
+    ///
+    /// Default: true
+    pub normalize_content_length: bool,
+
+    /// Whether client-declared operation intent (OIR) routing is enabled.
+    ///
+    /// When enabled (default), s3s honors the `x-id` query parameter (signed
+    /// under `SigV4` and sent by official AWS SDKs) to select the S3
+    /// operation directly, skipping the ambiguous full-router probing. The
+    /// declared operation is confirmed against the request shape; unknown or
+    /// non-matching declarations are rejected with `InvalidRequest`.
+    ///
+    /// Set to `false` to disable the OIR fast path entirely (requests fall
+    /// back to the normal routing logic).
+    ///
+    /// Default: true
+    pub operation_id_routing: bool,
+
+    /// Whether presigned URL (query) authentication is accepted.
+    ///
+    /// When disabled, a request that carries a presigned signature -- `X-Amz-Signature`
+    /// (`SigV4`) or `Signature` (`SigV2`) in the query -- is rejected with
+    /// `AccessDenied` instead of being verified. Header authentication and `POST`
+    /// signature authentication are unaffected.
+    ///
+    /// Default: true
+    pub allow_presigned_url: bool,
+
+    /// Whether `POST` form (`POST` policy) signature authentication is accepted.
+    ///
+    /// When disabled, a `POST` request with `multipart/form-data` that carries a signature
+    /// -- `x-amz-signature` (`SigV4`) or `signature` (`SigV2`) -- is rejected with
+    /// `AccessDenied`. A form without a signature is unaffected: it remains an anonymous
+    /// request for the configured access policy to decide on.
+    ///
+    /// Presigned URLs and header authentication are unaffected.
+    ///
+    /// Default: true
+    pub allow_post_signature: bool,
+    /// `x-amz-*` request headers that may be presented unsigned on a `SigV4` request.
+    ///
+    /// `SigV4` binds a request to the header set named in `SignedHeaders` /
+    /// `X-Amz-SignedHeaders`. An `x-amz-*` header outside that set is rejected with
+    /// `AccessDenied`, because routing and input parsing read those headers and an
+    /// unsigned one can change what the request does.
+    ///
+    /// Add an entry only when a client cannot sign the header, for example one
+    /// stamped by an intermediary, such as `"x-amz-cf-id"`. Entries are exact,
+    /// lowercase header names; no prefix matching is performed, and matching is
+    /// case-sensitive, so an entry copied from documentation in another casing
+    /// does not take effect.
+    ///
+    /// Default: empty (no `x-amz-*` header may be unsigned)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub unsigned_amz_header_allowlist: Vec<String>,
+}
+
+impl Default for S3Config {
+    fn default() -> Self {
+        Self {
+            xml_max_body_size: 20 * 1024 * 1024,               // 20 MiB
+            post_object_max_file_size: 5 * 1024 * 1024 * 1024, // 5 GiB
+            put_object_max_size: Some(DEFAULT_PUT_OBJECT_MAX_SIZE),
+            custom_route_max_body_size: Some(1024 * 1024), // 1 MiB
+            aws_chunked_stream_max_chunk_size: DEFAULT_AWS_CHUNKED_STREAM_MAX_CHUNK_SIZE,
+            form_max_field_size: 1024 * 1024,       // 1 MiB
+            form_max_fields_size: 20 * 1024 * 1024, // 20 MiB
+            form_max_parts: 1000,
+            form_max_envelope_size: None,
+            presigned_url_max_skew_time_secs: 900, // 15 minutes
+            expected_region: None,
+            sig_v4_allowed_services: default_sig_v4_allowed_services(),
+            sig_v4_strict_path: false,
+            enable_sig_v2: false,
+            presigned_url_max_expires_secs: DEFAULT_PRESIGNED_URL_MAX_EXPIRES_SECS,
+            normalize_forward_slash_path: false,
+            normalize_content_length: true,
+            operation_id_routing: true,
+            allow_presigned_url: true,
+            allow_post_signature: true,
+            unsigned_amz_header_allowlist: Vec::new(),
+        }
+    }
+}
+
+/// Static configuration provider.
+///
+/// This provider wraps an immutable configuration in an `Arc` for efficient sharing.
+/// Use this when configuration does not need to be updated at runtime.
+///
+/// Use `Arc<StaticConfigProvider>` when sharing across threads.
+///
+/// # Example
+/// ```
+/// use std::sync::Arc;
+/// use s3s::config::{S3Config, S3ConfigProvider, StaticConfigProvider};
+///
+/// let config = Arc::new(StaticConfigProvider::new(Arc::new(S3Config::default())));
+///
+/// // Read configuration via snapshot (just clones the Arc)
+/// let snapshot = config.snapshot();
+/// println!("Max XML body size: {}", snapshot.xml_max_body_size);
+/// ```
+#[derive(Debug)]
+pub struct StaticConfigProvider {
+    inner: Arc<S3Config>,
+}
+
+impl StaticConfigProvider {
+    /// Creates a new static configuration provider.
+    #[must_use]
+    pub fn new(config: Arc<S3Config>) -> Self {
+        Self { inner: config }
+    }
+}
+
+impl Default for StaticConfigProvider {
+    fn default() -> Self {
+        Self::new(Arc::new(S3Config::default()))
+    }
+}
+
+impl S3ConfigProvider for StaticConfigProvider {
+    fn snapshot(&self) -> Arc<S3Config> {
+        Arc::clone(&self.inner)
+    }
+}
+
+/// Hot-reload configuration provider.
+///
+/// This provider allows updating the configuration at runtime using `ArcSwap`
+/// for lock-free reads and atomic updates.
+///
+/// Use `Arc<HotReloadConfigProvider>` when sharing across threads.
+///
+/// # Example
+/// ```
+/// use std::sync::Arc;
+/// use s3s::config::{S3Config, S3ConfigProvider, HotReloadConfigProvider};
+///
+/// let config = Arc::new(HotReloadConfigProvider::new(Arc::new(S3Config::default())));
+///
+/// // Read configuration via snapshot (lock-free, consistent)
+/// let snapshot = config.snapshot();
+/// println!("Max XML body size: {}", snapshot.xml_max_body_size);
+///
+/// // Update configuration at runtime (atomic swap)
+/// let mut new_config = S3Config::default();
+/// new_config.xml_max_body_size = 10 * 1024 * 1024;
+/// config.update(Arc::new(new_config));
+/// ```
+#[derive(Debug)]
+pub struct HotReloadConfigProvider {
+    inner: ArcSwap<S3Config>,
+}
+
+impl HotReloadConfigProvider {
+    /// Creates a new hot-reload configuration provider.
+    #[must_use]
+    pub fn new(config: Arc<S3Config>) -> Self {
+        Self {
+            inner: ArcSwap::from(config),
+        }
+    }
+
+    /// Updates the configuration atomically.
+    ///
+    /// This operation replaces the entire configuration atomically.
+    pub fn update(&self, config: Arc<S3Config>) {
+        self.inner.store(config);
+    }
+}
+
+impl Default for HotReloadConfigProvider {
+    fn default() -> Self {
+        Self::new(Arc::new(S3Config::default()))
+    }
+}
+
+impl S3ConfigProvider for HotReloadConfigProvider {
+    fn snapshot(&self) -> Arc<S3Config> {
+        self.inner.load_full()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let config = S3Config::default();
+        assert_eq!(config.xml_max_body_size, 20 * 1024 * 1024);
+        assert_eq!(config.post_object_max_file_size, 5 * 1024 * 1024 * 1024);
+        assert_eq!(config.put_object_max_size, Some(DEFAULT_PUT_OBJECT_MAX_SIZE));
+        assert_eq!(config.custom_route_max_body_size, Some(1024 * 1024));
+        assert_eq!(config.form_max_field_size, 1024 * 1024);
+        assert_eq!(config.form_max_fields_size, 20 * 1024 * 1024);
+        assert_eq!(config.form_max_parts, 1000);
+        assert_eq!(config.presigned_url_max_skew_time_secs, 900);
+        assert_eq!(config.expected_region, None);
+        assert_eq!(config.sig_v4_allowed_services, ["s3", "sts"]);
+        assert_eq!(config.presigned_url_max_expires_secs, DEFAULT_PRESIGNED_URL_MAX_EXPIRES_SECS);
+        assert!(!config.enable_sig_v2);
+        assert!(config.operation_id_routing);
+    }
+
+    #[test]
+    fn test_static_config_provider() {
+        let provider = StaticConfigProvider::new(Arc::new(S3Config::default()));
+        assert_eq!(provider.snapshot().xml_max_body_size, 20 * 1024 * 1024);
+
+        // Snapshots should be the same Arc
+        let snapshot1 = provider.snapshot();
+        let snapshot2 = provider.snapshot();
+        assert!(Arc::ptr_eq(&snapshot1, &snapshot2));
+    }
+
+    #[test]
+    fn test_hot_reload_config_provider() {
+        let provider = HotReloadConfigProvider::new(Arc::new(S3Config::default()));
+        assert_eq!(provider.snapshot().xml_max_body_size, 20 * 1024 * 1024);
+
+        // Update configuration
+        provider.update(Arc::new(S3Config {
+            xml_max_body_size: 5 * 1024 * 1024,
+            ..Default::default()
+        }));
+        assert_eq!(provider.snapshot().xml_max_body_size, 5 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_hot_reload_snapshot_immutable() {
+        let provider = HotReloadConfigProvider::new(Arc::new(S3Config::default()));
+        let snapshot = provider.snapshot();
+
+        // Update configuration
+        provider.update(Arc::new(S3Config {
+            xml_max_body_size: 5 * 1024 * 1024,
+            ..Default::default()
+        }));
+
+        // Original snapshot should be unchanged
+        assert_eq!(snapshot.xml_max_body_size, 20 * 1024 * 1024);
+
+        // New read should reflect the update
+        assert_eq!(provider.snapshot().xml_max_body_size, 5 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_hot_reload_config_provider_arc() {
+        let provider = Arc::new(HotReloadConfigProvider::new(Arc::new(S3Config::default())));
+        let cloned = provider.clone();
+
+        // Both should read the same value
+        assert_eq!(provider.snapshot().xml_max_body_size, 20 * 1024 * 1024);
+        assert_eq!(cloned.snapshot().xml_max_body_size, 20 * 1024 * 1024);
+
+        // Updating one should update both (they share the same ArcSwap)
+        provider.update(Arc::new(S3Config {
+            xml_max_body_size: 5 * 1024 * 1024,
+            ..Default::default()
+        }));
+
+        assert_eq!(provider.snapshot().xml_max_body_size, 5 * 1024 * 1024);
+        assert_eq!(cloned.snapshot().xml_max_body_size, 5 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_config_provider_trait() {
+        let provider: Arc<dyn S3ConfigProvider> = Arc::new(HotReloadConfigProvider::default());
+        let snapshot = provider.snapshot();
+        assert_eq!(snapshot.xml_max_body_size, 20 * 1024 * 1024);
+        assert_eq!(snapshot.post_object_max_file_size, 5 * 1024 * 1024 * 1024);
+        assert_eq!(snapshot.put_object_max_size, Some(DEFAULT_PUT_OBJECT_MAX_SIZE));
+    }
+
+    #[test]
+    fn test_static_config_provider_trait() {
+        let provider: Arc<dyn S3ConfigProvider> = Arc::new(StaticConfigProvider::default());
+        let snapshot = provider.snapshot();
+        assert_eq!(snapshot.xml_max_body_size, 20 * 1024 * 1024);
+        assert_eq!(snapshot.post_object_max_file_size, 5 * 1024 * 1024 * 1024);
+        assert_eq!(snapshot.put_object_max_size, Some(DEFAULT_PUT_OBJECT_MAX_SIZE));
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let config = S3Config {
+            xml_max_body_size: 10 * 1024 * 1024,
+            post_object_max_file_size: 1024 * 1024 * 1024,
+            put_object_max_size: Some(512 * 1024 * 1024),
+            custom_route_max_body_size: Some(512 * 1024),
+            aws_chunked_stream_max_chunk_size: DEFAULT_AWS_CHUNKED_STREAM_MAX_CHUNK_SIZE,
+            form_max_field_size: 512 * 1024,
+            form_max_fields_size: 5 * 1024 * 1024,
+            form_max_parts: 500,
+            form_max_envelope_size: Some(20 * 1024),
+            presigned_url_max_skew_time_secs: 600,
+            expected_region: Some("us-west-2".parse().expect("valid test region")),
+            sig_v4_allowed_services: vec!["s3".to_owned(), "sts".to_owned(), "s3tables".to_owned()],
+            sig_v4_strict_path: false,
+            enable_sig_v2: true,
+            presigned_url_max_expires_secs: 86_400,
+            normalize_forward_slash_path: false,
+            normalize_content_length: true,
+            operation_id_routing: true,
+            allow_presigned_url: true,
+            allow_post_signature: true,
+            unsigned_amz_header_allowlist: vec!["x-amz-cf-id".to_owned()],
+        };
+
+        let json = serde_json::to_string(&config).expect("serialize failed");
+        let deserialized: S3Config = serde_json::from_str(&json).expect("deserialize failed");
+
+        assert_eq!(config, deserialized);
+    }
+
+    #[test]
+    fn test_serde_omits_default_unsigned_amz_header_allowlist() {
+        let json = serde_json::to_value(S3Config::default()).expect("serialize failed");
+        assert!(json.get("unsigned_amz_header_allowlist").is_none());
+    }
+
+    #[test]
+    fn test_serde_unsigned_amz_header_allowlist_defaults_to_empty() {
+        let config: S3Config = serde_json::from_str("{}").expect("deserialize failed");
+        assert_eq!(config.unsigned_amz_header_allowlist, [] as [String; 0]);
+    }
+
+    #[test]
+    fn test_serde_unsigned_amz_header_allowlist_is_configurable() {
+        let config: S3Config =
+            serde_json::from_str(r#"{"unsigned_amz_header_allowlist":["x-amz-cf-id"]}"#).expect("deserialize failed");
+        assert_eq!(config.unsigned_amz_header_allowlist, ["x-amz-cf-id"]);
+    }
+
+    #[test]
+    fn test_serde_default_values() {
+        // Test that missing fields use default values
+        let json = r#"{"xml_max_body_size": 1024}"#;
+        let config: S3Config = serde_json::from_str(json).expect("deserialize failed");
+
+        assert_eq!(config.xml_max_body_size, 1024);
+        // Other fields should have defaults
+        assert_eq!(config.post_object_max_file_size, 5 * 1024 * 1024 * 1024);
+        assert_eq!(config.put_object_max_size, Some(DEFAULT_PUT_OBJECT_MAX_SIZE));
+        assert_eq!(config.custom_route_max_body_size, Some(1024 * 1024));
+        assert_eq!(config.form_max_field_size, 1024 * 1024);
+        assert_eq!(config.sig_v4_allowed_services, ["s3", "sts"]);
+        assert_eq!(config.presigned_url_max_expires_secs, DEFAULT_PRESIGNED_URL_MAX_EXPIRES_SECS);
+        assert!(config.normalize_content_length);
+    }
+
+    #[test]
+    fn test_serde_null_disables_put_object_max_size() {
+        // An explicit `null` opts out of the default limit (the opt-out path).
+        let json = r#"{"put_object_max_size": null}"#;
+        let config: S3Config = serde_json::from_str(json).expect("deserialize failed");
+        assert_eq!(config.put_object_max_size, None);
+    }
+
+    #[test]
+    fn test_serde_explicit_put_object_max_size_overrides_default() {
+        let json = r#"{"put_object_max_size": 1024}"#;
+        let config: S3Config = serde_json::from_str(json).expect("deserialize failed");
+        assert_eq!(config.put_object_max_size, Some(1024));
+    }
+
+    #[test]
+    fn test_serde_omits_unset_expected_region() {
+        let json = serde_json::to_value(S3Config::default()).expect("serialize failed");
+        assert!(json.get("expected_region").is_none());
+    }
+
+    #[test]
+    fn test_allow_presigned_url_defaults_to_true() {
+        assert!(S3Config::default().allow_presigned_url);
+        let config: S3Config = serde_json::from_str("{}").expect("deserialize failed");
+        assert!(config.allow_presigned_url, "a missing field must keep presigned URLs enabled");
+    }
+
+    #[test]
+    fn test_allow_post_signature_defaults_to_true() {
+        assert!(S3Config::default().allow_post_signature);
+        let config: S3Config = serde_json::from_str("{}").expect("deserialize failed");
+        assert!(config.allow_post_signature, "a missing field must keep POST signatures enabled");
+    }
+
+    #[test]
+    fn test_allow_post_signature_can_be_disabled_and_round_trips() {
+        let config: S3Config = serde_json::from_str(r#"{"allow_post_signature":false}"#).expect("deserialize failed");
+        assert!(!config.allow_post_signature);
+
+        let encoded = serde_json::to_value(&config).expect("serialize failed");
+        assert_eq!(encoded.get("allow_post_signature"), Some(&serde_json::json!(false)));
+        let decoded: S3Config = serde_json::from_value(encoded).expect("deserialize failed");
+        assert_eq!(config, decoded);
+    }
+
+    #[test]
+    fn test_allow_presigned_url_can_be_disabled_and_round_trips() {
+        let json = r#"{"allow_presigned_url":false}"#;
+        let config: S3Config = serde_json::from_str(json).expect("deserialize failed");
+        assert!(!config.allow_presigned_url);
+
+        let encoded = serde_json::to_value(&config).expect("serialize failed");
+        assert_eq!(encoded.get("allow_presigned_url"), Some(&serde_json::json!(false)));
+        let decoded: S3Config = serde_json::from_value(encoded).expect("deserialize failed");
+        assert_eq!(config, decoded);
+    }
+
+    #[test]
+    fn test_serde_omits_explicit_none_put_object_max_size() {
+        // The default now serializes as a value; only an explicit `None` is omitted.
+        let config = S3Config {
+            put_object_max_size: None,
+            ..S3Config::default()
+        };
+        let json = serde_json::to_value(config).expect("serialize failed");
+        assert!(json.get("put_object_max_size").is_none());
+    }
+
+    #[test]
+    fn test_serde_omits_default_sig_v4_allowed_services() {
+        let json = serde_json::to_value(S3Config::default()).expect("serialize failed");
+        assert!(json.get("sig_v4_allowed_services").is_none());
+    }
+
+    #[test]
+    fn test_hot_reload_in_service_layer() {
+        // Test simulating how config would be used in service layer
+        let provider = Arc::new(HotReloadConfigProvider::new(Arc::new(S3Config::default())));
+
+        // Simulate processing requests with initial config
+        let snapshot = provider.snapshot();
+        assert_eq!(snapshot.xml_max_body_size, 20 * 1024 * 1024);
+
+        // Simulate config reload (e.g., from config file change)
+        provider.update(Arc::new(S3Config {
+            xml_max_body_size: 30 * 1024 * 1024,
+            ..Default::default()
+        }));
+
+        // New requests should see updated config
+        let new_snapshot = provider.snapshot();
+        assert_eq!(new_snapshot.xml_max_body_size, 30 * 1024 * 1024);
+    }
+}

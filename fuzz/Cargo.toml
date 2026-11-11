@@ -1,0 +1,76 @@
+[package]
+name = "mikrio-fuzz"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "Apache-2.0"
+publish = false
+
+[workspace]
+members = ["."]
+resolver = "3"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+base64-simd = { version = "=0.8.0", default-features = false, features = ["detect", "std"] }
+bytes = { version = "=1.12.1", default-features = false, features = ["std"] }
+futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
+libfuzzer-sys = "=0.4.13"
+s3s = { package = "mikrio-s3s", version = "=0.17.0-mikrio.1", path = "../vendor/s3s-0.17.0", default-features = false }
+
+[[bin]]
+name = "multipart"
+path = "fuzz_targets/multipart.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "post_policy"
+path = "fuzz_targets/post_policy.rs"
+test = false
+doc = false
+bench = false
+
+[lints.rust]
+unsafe_code = "forbid"
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+let_underscore_lock = "deny"
+unreachable_pub = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+
+[lints.rustdoc]
+broken_intra_doc_links = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+# Mirror the root policy, retaining the stronger unsafe-code and all-lint levels.
+await_holding_lock = "warn"
+await_holding_refcell_ref = "warn"
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"
+allow_attributes_without_reason = "warn"
+let_underscore_future = "warn"
+let_underscore_must_use = "warn"
+mem_forget = "warn"
+clone_on_ref_ptr = "warn"
+as_conversions = "warn"
+string_slice = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+unreachable = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+exit = "warn"
+module_name_repetitions = "allow"
+too_many_lines = "allow"
+too_many_arguments = "allow"

@@ -1,0 +1,65 @@
+[graph]
+all-features = false
+
+[advisories]
+db-path = ".cache/advisory-dbs"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+unmaintained = "all"
+yanked = "deny"
+
+[licenses]
+allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
+confidence-threshold = 0.93
+
+# Reviewed build-only target parser; the LLVM exception adds permissions to
+# Apache-2.0. Revisit with the PyO3 input review on version changes.
+[[licenses.exceptions]]
+name = "target-lexicon"
+version = "=0.13.5"
+allow = ["Apache-2.0 WITH LLVM-exception"]
+
+# NAPI's platform loader. ISC permits redistribution with its copyright and
+# permission notice, included in the native artifact's generated notices.
+[[licenses.exceptions]]
+name = "libloading"
+version = "=0.9.0"
+allow = ["ISC"]
+
+# Reviewed constant-time comparison; retain its copyright, BSD notice and
+# non-endorsement clause in the generated native notices.
+[[licenses.exceptions]]
+name = "subtle"
+version = "=2.6.1"
+allow = ["BSD-3-Clause"]
+
+# Upstream S3 checksum helper; preserve Boost's notice in source/artifact notices.
+[[licenses.exceptions]]
+name = "xxhash-rust"
+version = "=0.8.19"
+allow = ["BSL-1.0"]
+
+# rusqlite's bounded cache hashes fixed SQL text. Preserve the unmodified Zlib
+# source notice and attribution in generated native artifact notices.
+[[licenses.exceptions]]
+name = "foldhash"
+version = "=0.2.0"
+allow = ["Zlib"]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+highlight = "all"
+# tracing-attributes and jiff-static still use syn 2 while other macros use syn 3.
+# These cannot be unified without replacing upstream releases. Remove when converged.
+# crc-fast still implements the digest 0.10 API; s3s HMAC/SHA use 0.11.
+# Retain these exact old versions until the upstream CRC bridge converges.
+skip = [
+    { name = "syn", version = "=2.0.119" },
+    { name = "digest", version = "=0.10.7" },
+    { name = "crypto-common", version = "=0.1.7" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

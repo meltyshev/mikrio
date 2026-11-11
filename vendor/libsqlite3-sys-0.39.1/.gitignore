@@ -1,0 +1,6 @@
+# Build output
+/doc/
+/target/
+
+# Library lockfile
+Cargo.lock
