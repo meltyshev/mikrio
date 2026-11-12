@@ -7,10 +7,8 @@ import {
   readFile,
   readdir,
   realpath,
-  rm,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { createInterface } from "node:readline";
 import { setTimeout as delay } from "node:timers/promises";
@@ -40,13 +38,18 @@ function cleanup(
 }
 
 async function directory(testContext: TestContext): Promise<string> {
-  const path = await mkdtemp(join(tmpdir(), "mikrio-installed-node-"));
+  const root = process.env.mikrio_test_directory;
 
-  const actions: (() => void | Promise<void>)[] = [
-    async () => {
-      await rm(path, { recursive: true, force: true });
-    },
-  ];
+  assert.ok(
+    root,
+    "qualification must supply a process-owned fixture directory",
+  );
+
+  // Canceled opens can outlive their JS promises. The parent harness removes
+  // fixture files after process exit releases the native handles.
+  const path = await mkdtemp(join(root, "lifecycle-"));
+
+  const actions: (() => void | Promise<void>)[] = [];
 
   cleanups.set(testContext, actions);
 

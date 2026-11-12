@@ -273,8 +273,8 @@ jobs:
           working_tree_status=$(git status --porcelain)
           test -z "$working_tree_status"
 
-  windows-ffi:
-    name: Build and test Windows C distribution
+  windows-native:
+    name: Build and test Windows native distributions
     needs: dependencies
     if: github.event_name != 'schedule'
     runs-on: windows-2025
@@ -287,6 +287,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.0
+          package-manager-cache: false
 
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
@@ -301,14 +307,21 @@ jobs:
           python-version: 3.14.10
           enable-cache: false
 
+      - name: Set up pnpm
+        run: |
+          npm install --global --ignore-scripts pnpm@12.18.0
+          # Activate the native binary with pnpm's reviewed setup hook.
+          node "$(npm root --global)/pnpm/install.js"
+
       - name: Test C consumer harness
         run: uv run --no-project python -m unittest discover -s tests/ffi
 
-      - name: Build C distribution
-        run: uv run --no-project python -m tools.build ffi
-
-      - name: Test installed C distribution
-        run: uv run --no-project python -m tools.test_ffi dist/mikrio-c-*.tar.gz
+      - name: Build and test native distributions
+        run: |
+          pnpm install --frozen-lockfile
+          uv sync --project packages/python --locked --group build --no-install-project --no-build
+          uv run --project packages/python --no-sync python -m tools.build_release native \
+            --target windows-x86_64
 
       - name: Verify clean working tree
         run: |

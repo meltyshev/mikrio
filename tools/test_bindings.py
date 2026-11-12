@@ -244,6 +244,10 @@ def run_node_tests(
             ROOT / "tests/bindings/native_guard.py", directory / "native_guard.py"
         )
 
+        fixtures = directory / "fixtures"
+        fixtures.mkdir()
+
+        env["mikrio_test_directory"] = str(fixtures)
         env["mikrio_test_python"] = sys.executable
 
         if probes:

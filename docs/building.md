@@ -51,8 +51,9 @@ c++ -std=c++20 -Wall -Wextra -Werror -pthread -fsyntax-only \
 CI runs these checks before toolchain setup on Linux and macOS. They require
 only the checked-in headers and platform compilers. The installed consumer tests
 below separately verify linking and runtime behavior against the C distribution.
-After dependency audits, a separate Windows job builds the C distribution with
-MSVC and runs those installed consumers alongside the Linux and macOS suites.
+After dependency audits, a separate Windows job builds and tests all native
+distributions, including these installed C consumers, alongside the Linux and
+macOS suites. It uses the same native build and test command as the release job.
 
 The C administration harness also has subprocess protocol tests. Windows runs
 them before compiling the distribution so pipe failures surface early.
@@ -176,12 +177,35 @@ native target name from the support guide) for CLI, C, Node.js, and Python
 archives, or `sources` for Rust archives and the Python sdist. Select an empty
 directory with `--output`; these commands build and test without publishing.
 
+For a complete local Windows check, use the pinned tool versions listed above
+and an x64 MSVC developer shell with `cl`, `link`, and `dumpbin` on `PATH`. Run
+from the repository root with an empty output directory:
+
+```powershell
+rustup show
+uv run --no-project python -m unittest discover -s tests/ffi
+pnpm install --frozen-lockfile
+uv sync --project packages/python --locked --group build --no-install-project --no-build
+uv run --project packages/python --no-sync python -m tools.build_release native --target windows-x86_64 --output dist/windows
+```
+
+This builds CLI, C, Node.js, and Python archives and tests their installed
+contents. A successful compile alone does not complete this check. The Windows
+job in Checks runs the same coverage before the release workflow's native-build
+stage.
+
 Verify the maintained S3 templates with
 `python3 -m tools.regenerate_s3s --check`. Omit `--check` to regenerate the
 patched operations and COPY result declarations from
 `vendor/s3s-0.17.0/codegen/` after changing their templates.
 
 ## Installed consumers
+
+The Node lifecycle tests close owned stores, bodies, and helper processes after
+each case. Their directories belong to the parent consumer harness, which
+removes them after Node exits. Canceled acquisition can reject before its native
+cleanup finishes, so per-test directory removal cannot establish that those
+files are no longer open.
 
 ```sh
 release_version=$(python3 -m tools.version show)
