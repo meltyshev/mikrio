@@ -7,7 +7,7 @@ dependencies are locked in `packages/python/uv.lock`. A C compiler and the
 platform SDK are required for native builds. End users of wheels and native npm
 packages do not need Rust.
 
-CI runs dependency checks on each change, release rehearsal, and tag release,
+CI runs dependency checks on each change, release rehearsal, and publication,
 and weekly on `main`. These use cargo-deny 0.20.2 for Rust advisories, licenses,
 and sources, pnpm audit for both JavaScript lockfiles, and the locked pip-audit
 version for the Python contributor and SDK graphs. Audit failures block release

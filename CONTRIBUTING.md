@@ -8,6 +8,11 @@ change. Include a focused regression test for a behavior change and explain the
 problem, resulting behavior, and tests run in the pull request. Keep formatting
 changes separate from changes to storage or ownership.
 
+Maintainers may push directly to `main` after running the applicable local
+checks. Contributor changes use pull requests with maintainer approval and
+passing checks, then squash merge. A failed check on `main` must be fixed or
+reverted before release.
+
 ## Repository layout
 
 | Path                              | Purpose                              |
@@ -83,7 +88,7 @@ preserve their licenses, patch descriptions, and generated-source checks.
 
 ## Releases
 
-Maintainers choose the release version and review release notes. A version tag
-starts the release workflow; registry uploads wait for environment approval.
-Manual runs from `main` build and test without publishing. See the
+Maintainers choose the release version and review release notes. Run the release
+workflow from `main` in `rehearsal` mode to build and test, or `publish` mode to
+create the version tag and publish after registry environment approval. See the
 [release guide](docs/releasing.md).

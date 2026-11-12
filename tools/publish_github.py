@@ -1,4 +1,4 @@
-"""Complete a GitHub draft only after every immutable asset has been verified."""
+"""Tag tested source and publish a GitHub release with verified immutable assets."""
 
 from __future__ import annotations
 
@@ -51,6 +51,36 @@ def find_release(tag: str) -> dict[str, Any] | None:
         raise ValueError("multiple GitHub releases use the release tag")
 
     return matches[0] if matches else None
+
+
+def create_tag(directory: Path) -> None:
+    verify(directory)
+    tag = "v" + check()
+
+    references = json.loads(
+        subprocess.check_output(
+            ["gh", "api", f"repos/{REPOSITORY}/git/matching-refs/tags/{tag}"],
+            encoding="utf-8",
+        )
+    )
+
+    if not any(reference["ref"] == f"refs/tags/{tag}" for reference in references):
+        subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{REPOSITORY}/git/refs",
+                "--method",
+                "POST",
+                "--raw-field",
+                f"ref=refs/tags/{tag}",
+                "--raw-field",
+                f"sha={source_revision()}",
+            ],
+            check=True,
+        )
+
+    verify_tag(tag)
 
 
 def publish(directory: Path) -> None:
@@ -143,9 +173,14 @@ def verify_tag(tag: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("tag", "publish"))
     parser.add_argument("directory", type=Path)
     arguments = parser.parse_args()
-    publish(arguments.directory)
+
+    if arguments.action == "tag":
+        create_tag(arguments.directory)
+    else:
+        publish(arguments.directory)
 
 
 if __name__ == "__main__":

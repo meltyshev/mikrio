@@ -1,10 +1,20 @@
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
-  # Manual runs rehearse from main and never publish.
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Release mode
+        type: choice
+        options: [rehearsal, publish]
+        default: rehearsal
+        required: true
+      bootstrap:
+        description: Use temporary crates.io and npm tokens for the first publication
+        type: boolean
+        default: false
+
+run-name: Release (${{ inputs.mode }})
 
 permissions: {}
 
@@ -34,6 +44,7 @@ jobs:
     outputs:
       version: ${{ steps.identity.outputs.version }}
       publish: ${{ steps.identity.outputs.publish }}
+      bootstrap: ${{ steps.identity.outputs.bootstrap }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,6 +54,9 @@ jobs:
 
       - name: Verify release version and source
         id: identity
+        env:
+          RELEASE_MODE: ${{ inputs.mode }}
+          RELEASE_BOOTSTRAP: ${{ inputs.bootstrap }}
         run: python3 -m tools.release check
 
   checks:
@@ -349,7 +363,7 @@ jobs:
             echo
             echo "[Download the tested archives, release manifest and checksums]($ARTIFACT_URL)."
             echo
-            echo "Manual runs stop here. Tag runs require registry environment approvals."
+            echo "Rehearsals stop here. Publishing runs create the version tag and require registry environment approvals."
           } >> "$GITHUB_STEP_SUMMARY"
 
   attest:
@@ -376,9 +390,36 @@ jobs:
         with:
           subject-checksums: release/SHA256SUMS
 
+  tag:
+    name: Create release tag
+    needs: [prepare, assemble, attest]
+    if: needs.prepare.outputs.publish == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download release distributions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          path: release
+          merge-multiple: true
+          digest-mismatch: error
+
+      - name: Create tag for the tested source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m tools.publish_github tag release
+
   crates:
     name: Publish to crates.io
-    needs: [prepare, assemble, attest]
+    needs: [prepare, assemble, tag]
     if: needs.prepare.outputs.publish == 'true'
     permissions:
       contents: read
@@ -403,18 +444,29 @@ jobs:
       - name: Verify release before authentication
         run: python3 -m tools.release verify release
 
+      - name: Verify bootstrap credentials
+        if: needs.prepare.outputs.bootstrap == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [[ -z "$CARGO_REGISTRY_TOKEN" ]]; then
+            echo "::error::Set CARGO_REGISTRY_TOKEN in the crates-io environment for bootstrap publishing."
+            exit 1
+          fi
+
       - name: Authenticate with crates.io
+        if: needs.prepare.outputs.bootstrap != 'true'
         id: auth
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
 
       - name: Publish crates to crates.io
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          CARGO_REGISTRY_TOKEN: ${{ needs.prepare.outputs.bootstrap == 'true' && secrets.CARGO_REGISTRY_TOKEN || steps.auth.outputs.token }}
         run: python3 -m tools.publish crates release
 
   npm:
     name: Publish to npm
-    needs: [prepare, assemble, attest]
+    needs: [prepare, assemble, tag]
     if: needs.prepare.outputs.publish == 'true'
     permissions:
       contents: read
@@ -433,6 +485,7 @@ jobs:
         with:
           node-version: 26.13.0
           package-manager-cache: false
+          registry-url: ${{ needs.prepare.outputs.bootstrap == 'true' && 'https://registry.npmjs.org/' || '' }}
 
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -442,12 +495,25 @@ jobs:
           merge-multiple: true
           digest-mismatch: error
 
+      - name: Verify bootstrap credentials
+        if: needs.prepare.outputs.bootstrap == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [[ -z "$NODE_AUTH_TOKEN" ]]; then
+            echo "::error::Set NPM_TOKEN in the npm environment for bootstrap publishing."
+            exit 1
+          fi
+
       - name: Publish packages to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ needs.prepare.outputs.bootstrap == 'true' && secrets.NPM_TOKEN || '' }}
+          NPM_CONFIG_PROVENANCE: "true"
         run: python3 -m tools.publish npm release
 
   pypi:
     name: Publish to PyPI
-    needs: [prepare, assemble, attest]
+    needs: [prepare, assemble, tag]
     if: needs.prepare.outputs.publish == 'true'
     permissions:
       contents: read
@@ -603,4 +669,4 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 -m tools.publish_github release
+        run: python3 -m tools.publish_github publish release

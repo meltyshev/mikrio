@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import struct
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -247,27 +248,143 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "truncated"):
             release.verify_native_architecture(b"", "linux-arm64")
 
-    def test_preflight_cannot_publish_from_dispatch_or_an_unmatched_tag(self) -> None:
+
+class ReleasePreflightTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.git("init", "--quiet", "--initial-branch=main")
+
+        self.git(
+            "-c",
+            "user.name=Release tests",
+            "-c",
+            "user.email=release@example.invalid",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "Initial commit",
+        )
+
+        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        self.revision = self.git("rev-parse", "HEAD").strip()
+
+    def git(self, *arguments: str) -> str:
+        return subprocess.check_output(
+            ["git", *arguments], cwd=self.root, encoding="utf-8"
+        )
+
+    def preflight(self, **changes: str) -> dict[str, str]:
         environment = {
             "GITHUB_REPOSITORY": release.REPOSITORY,
             "GITHUB_EVENT_NAME": "workflow_dispatch",
             "GITHUB_REF": "refs/heads/main",
+            "GITHUB_SHA": self.revision,
+            "RELEASE_MODE": "rehearsal",
+            "RELEASE_BOOTSTRAP": "false",
         }
 
         with (
-            patch.dict("os.environ", environment),
+            patch.dict("os.environ", environment | changes),
+            patch.object(release, "ROOT", self.root),
             patch.object(release, "check", return_value="0.1.0"),
             patch.object(release, "release_notes"),
-            patch("tools.release.subprocess.check_output", return_value=b""),
-            patch("tools.release.subprocess.run"),
             patch.object(release, "write_output") as output,
         ):
             release.preflight()
-            self.assertIn(unittest.mock.call("publish", "false"), output.call_args_list)
+            return dict(call.args for call in output.call_args_list)
 
-            with patch.dict(
-                "os.environ",
-                {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/tags/v0.2.0"},
+    def test_rehearsal_does_not_publish_or_use_bootstrap_credentials(self) -> None:
+        self.assertEqual(
+            self.preflight(),
+            {"version": "0.1.0", "publish": "false", "bootstrap": "false"},
+        )
+
+    def test_publish_supports_trusted_and_bootstrap_authentication(self) -> None:
+        for bootstrap in ("false", "true"):
+            with self.subTest(bootstrap=bootstrap):
+                self.assertEqual(
+                    self.preflight(RELEASE_MODE="publish", RELEASE_BOOTSTRAP=bootstrap),
+                    {"version": "0.1.0", "publish": "true", "bootstrap": bootstrap},
+                )
+
+    def test_only_manual_runs_from_the_repository_main_branch_are_accepted(
+        self,
+    ) -> None:
+        for changed, message in (
+            ({"GITHUB_REPOSITORY": "someone/mikrio"}, "unexpected release repository"),
+            ({"GITHUB_EVENT_NAME": "push"}, "run the release workflow from main"),
+            (
+                {"GITHUB_EVENT_NAME": "pull_request"},
+                "run the release workflow from main",
+            ),
+            (
+                {"GITHUB_REF": "refs/heads/feature"},
+                "run the release workflow from main",
+            ),
+            ({"GITHUB_REF": "refs/tags/v0.1.0"}, "run the release workflow from main"),
+        ):
+            with (
+                self.subTest(changed=changed),
+                self.assertRaisesRegex(ValueError, message),
             ):
-                with self.assertRaisesRegex(ValueError, "matching version tag"):
-                    release.preflight()
+                self.preflight(RELEASE_MODE="publish", **changed)
+
+    def test_invalid_modes_and_bootstrap_rehearsals_are_rejected(self) -> None:
+        for changed, message in (
+            ({"RELEASE_MODE": "unknown"}, "invalid release mode"),
+            ({"RELEASE_MODE": ""}, "invalid release mode"),
+            ({"RELEASE_BOOTSTRAP": "yes"}, "invalid release mode or bootstrap option"),
+            (
+                {"RELEASE_BOOTSTRAP": "true"},
+                "bootstrap authentication requires publish",
+            ),
+        ):
+            with (
+                self.subTest(changed=changed),
+                self.assertRaisesRegex(ValueError, message),
+            ):
+                self.preflight(**changed)
+
+    def test_checkout_must_match_the_workflow_commit(self) -> None:
+        with self.assertRaisesRegex(ValueError, "workflow source"):
+            self.preflight(RELEASE_MODE="publish", GITHUB_SHA="different")
+
+    def test_source_must_belong_to_main(self) -> None:
+        self.git(
+            "-c",
+            "user.name=Release tests",
+            "-c",
+            "user.email=release@example.invalid",
+            "commit",
+            "--quiet",
+            "--allow-empty",
+            "-m",
+            "Unmerged change",
+        )
+
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.preflight(
+                RELEASE_MODE="publish", GITHUB_SHA=self.git("rev-parse", "HEAD").strip()
+            )
+
+    def test_dirty_source_cannot_be_released(self) -> None:
+        (self.root / "untracked").write_bytes(b"unreviewed")
+
+        with self.assertRaisesRegex(ValueError, "clean checkout"):
+            self.preflight(RELEASE_MODE="publish")
+
+    def test_existing_tag_requires_resuming_the_original_run(self) -> None:
+        self.git("tag", "v0.1.0")
+
+        with self.assertRaisesRegex(ValueError, "resume the original run"):
+            self.preflight(RELEASE_MODE="publish")
+
+        self.assertEqual(self.preflight()["publish"], "false")
+
+    def test_similar_tag_does_not_block_a_new_release(self) -> None:
+        self.git("tag", "v0.1.00")
+
+        self.assertEqual(self.preflight(RELEASE_MODE="publish")["publish"], "true")

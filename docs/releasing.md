@@ -1,16 +1,19 @@
 # Releasing
 
 The [release workflow](../.github/workflows/release.yaml) builds, tests, and
-publishes the distribution archives. A manual run from `main` is a build-only
-rehearsal. Pushing a matching `v<version>` tag starts a release; registry
-uploads wait for approval of the protected environments. Maintainers review the
+publishes the distribution archives. Start it through **Actions -> Release ->
+Run workflow** from `main`. The default `rehearsal` mode builds and tests
+without publishing. The `publish` mode also creates `v<version>` for the tested
+commit and publishes after registry environment approval. Maintainers review the
 source, release notes, platform limits, and completed artifacts before
-approving.
+approving. The version comes from the committed package metadata; the workflow
+does not change versions or commit source files.
 
 ## Names and prerequisites
 
 The repository is `meltyshev/mikrio`. Before the first release, enable private
-vulnerability reporting and establish registry ownership for these names:
+vulnerability reporting and verify that the publishing accounts can create or
+update these names:
 
 - **crates.io:** `mikrio`, `mikrio-build`, `mikrio-core`, `mikrio-http`,
   `mikrio-embed`, `mikrio-ffi`, and `mikrio-cli`.
@@ -48,7 +51,7 @@ inherits the Cargo version; the uv and pnpm locks need no version-only rewrite.
 Verify that the locks remain valid:
 
 ```sh
-cargo metadata --locked --offline --format-version 1
+cargo metadata --locked --format-version 1
 uv lock --project packages/python --check
 pnpm install --frozen-lockfile
 ```
@@ -81,59 +84,112 @@ Rust package graph from an external consumer as well as the workspace.
 files immutable. Repository or metadata changes after the build require affected
 artifacts to be rebuilt and checked before publication.
 
-## Configure publishing
+## GitHub repository setup
 
-Create GitHub environments `crates-io`, `npm`, and `pypi`. Restrict deployment
-to selected **tags** matching `v*`, require a maintainer review, and disable
-bypass of the protection rules. A sole maintainer must allow self-review.
-Protect `main` and release tags against unauthorized changes, deletion, and
-force pushes. Enable GitHub's immutable releases before publication: the
-workflow attaches all assets to a draft and publishes it last.
+1. In **Settings -> Actions -> General**, enable Actions and allow the pinned
+   actions used by the workflows. The default **Workflow permissions** can stay
+   at **Read repository contents and packages permissions**: the workflow grants
+   additional permissions only to the jobs that need them. No GitHub personal
+   access token or permission to create pull requests is needed.
+2. In **Settings -> Environments**, create `crates-io`, `npm`, and `pypi`. For
+   each environment, enable **Required reviewers** and add a maintainer. A sole
+   maintainer must leave **Prevent self-review** unchecked. Deselect **Allow
+   administrators to bypass configured protection rules**.
+3. In each environment's **Deployment branches and tags**, choose **Selected
+   branches and tags**. Add a rule with ref type **Branch** and name `main`. The
+   run remains associated with `main` even after it creates the version tag.
+4. In **Settings -> Rules -> Rulesets**, create an active branch ruleset named
+   `main-review` targeting `main`. Require a pull request with one maintainer
+   approval and the `Checks` workflow's `Audit dependencies`,
+   `Check and test (ubuntu-24.04-arm)`, and `Check and test (macos-15)` jobs.
+   Add **Repository administrators** to its bypass list with **Always allow** to
+   preserve maintainer direct pushes after local checks. Release runs still
+   require their own complete checks before publishing.
+5. Create a separate active branch ruleset named `main-history` targeting
+   `main`, with **Block force pushes** and **Restrict deletions**, and no bypass
+   actors. This keeps history protection independent of maintainer direct
+   pushes.
+6. Create an active tag ruleset targeting `v*`. Enable **Restrict updates** and
+   **Restrict deletions**. Leave tag creation allowed so the workflow's built-in
+   token can create release tags. Keep its bypass list empty.
+7. In **Settings -> General -> Releases**, select **Enable release
+   immutability**. The workflow attaches and verifies all assets while the
+   release is a draft, then publishes it last.
 
-Require the `Checks` workflow's `Audit dependencies`,
-`Check and test (ubuntu-24.04-arm)`, and `Check and test (macos-15)` jobs on
-`main`. These are the job names to select in branch protection or a ruleset.
+See [GitHub environment setup][github-environments], [repository
+rulesets][github-rulesets], and [release immutability
+settings][github-immutable-releases] for the corresponding GitHub controls.
 
-All trusted publishers use owner `meltyshev`, repository `mikrio`, and workflow
-filename **`release.yaml`**. The filename and environment are case-sensitive.
+## Registry setup for the first publication
 
-- **PyPI (`pypi`):** Add a pending publisher for `mikrio`; it creates the
-  project on the first upload.
-- **npm (`npm`):** Publish the six packages with a maintainer account, then
-  configure a GitHub Actions trusted publisher in each package's settings. Allow
-  direct publishing with `npm publish`; the default stage-only permission does
-  not authorize this workflow.
-- **crates.io (`crates-io`):** Publish the thirteen crates with a narrowly
-  scoped, short-lived token, then configure trusted publishing for each crate.
+The first npm and crates.io uploads run in GitHub Actions using temporary API
+tokens. Select `bootstrap` only for this publication. Normal runs use trusted
+publishing and never fall back to stored tokens.
 
-Use account two-factor authentication. After the initial npm upload, select the
-package setting that requires 2FA and disallows traditional publishing tokens;
-trusted publishing remains available. Configure npm trust shortly before its
-first automated upload: a new configuration expires if unused for two days. No
-long-lived npm, PyPI, or Cargo token belongs in GitHub secrets for this
-workflow.
+Use accounts with verified email addresses and two-factor authentication. On
+npm, create or obtain publishing access to the `@mikrio` scope as well as the
+unscoped `mikrio` name. A GitHub repository does not grant ownership of registry
+names.
 
-Official setup instructions: [PyPI pending publishers][pypi-pending-publishers],
-[npm trusted publishers][npm-trusted-publishers], [crates.io trusted
-publishing][crates-io-trusted-publishing], and [GitHub immutable
-releases][github-immutable-releases].
+### crates.io
+
+In the publishing account's **Account Settings -> API Tokens**, create a token
+with an expiration such as **7 days**. Under **Scopes**, select **publish-new**
+and deselect unrelated permissions. Under **Crates -> Add pattern**, add
+`mikrio` and `mikrio-*`. If bootstrap must upload new versions of existing
+crates, also enable **publish-update**. Add the token in GitHub under **Settings
+-> Environments -> crates-io -> Environment secrets** with the name
+**`CARGO_REGISTRY_TOKEN`**.
+
+### npm
+
+In npm's **Access Tokens**, generate a granular access token with **Read and
+write** package permissions and **Bypass two-factor authentication** enabled for
+non-interactive publishing. It must permit creating `mikrio` and the five
+`@mikrio` packages. Use **All Packages** when the unpublished unscoped name
+cannot be selected, and give the token a short expiration. Organization
+administration permissions are not needed. Add it to the GitHub `npm`
+environment as **`NPM_TOKEN`**. See [npm token setup][npm-tokens].
+
+### PyPI
+
+In PyPI's account **Publishing** settings, add a pending GitHub publisher:
+
+| Field             | Value          |
+| ----------------- | -------------- |
+| PyPI project      | `mikrio`       |
+| Owner             | `meltyshev`    |
+| Repository        | `mikrio`       |
+| Workflow filename | `release.yaml` |
+| Environment       | `pypi`         |
+
+It creates the project on the first upload. No PyPI API token is needed. If the
+project already belongs to the publishing account, add the same trusted
+publisher in the project's settings instead. See [PyPI pending
+publishers][pypi-pending-publishers].
 
 ## Rehearse and release
 
 1. Commit the reviewed version change, changelog entry, and supporting changes.
-   Run **Release -> Run workflow** from `main` for a build-only rehearsal.
+   Run **Actions -> Release -> Run workflow**, select branch `main`, leave
+   `mode` at `rehearsal`, and leave `bootstrap` unchecked.
 2. Inspect the completed run and download its `release-<version>` artifact. It
    contains the packages, `release.json`, `publish-order.json`, reviewed release
    notes, and `SHA256SUMS`. Review test results, dependency audits, licenses,
    and support claims.
-3. Create and push `v<version>` pointing to the reviewed commit on `main` when
-   ready to publish. Tag runs repeat the checks and builds. Review the **tag
-   run's** artifact before approving the three registry environments; that
-   artifact, rather than an earlier rehearsal, is the publication input.
-4. The workflow publishes Rust dependencies in order, npm native packages before
+3. Run the workflow again from `main` with `mode` set to `publish`. Check
+   `bootstrap` for the first npm and crates.io publication; otherwise leave it
+   unchecked. The workflow repeats checks and builds, attests the resulting
+   bundle, and creates `v<version>` at the tested commit. Do not create the tag
+   or GitHub Release manually. Tag pushes do not start this workflow.
+4. Download and inspect the **publishing run's** artifact. In the run's **Review
+   deployments** panel, approve `crates-io`, `npm`, and `pypi` when ready.
+   Approvals release those exact archives for publication.
+5. The workflow publishes Rust dependencies in order, npm native packages before
    their wrapper, and the complete Python distribution set. Registry jobs use
-   short-lived OIDC credentials and do not compile or execute package contents.
-5. Separate jobs verify registry hashes and ordinary Rust, Python, and npm
+   trusted publishing unless bootstrap tokens were explicitly selected for npm
+   and crates.io. They do not compile or execute package contents.
+6. Separate jobs verify registry hashes and ordinary Rust, Python, and npm
    installations on Linux arm64 and macOS arm64. GitHub release assets are
    uploaded and verified while the release is a draft; the release becomes
    public only after these checks succeed.
@@ -155,47 +211,46 @@ tools and container revisions follow the
 [dependency policy](../CONTRIBUTING.md#dependencies). Publishing jobs download
 one immutable artifact ID from the same run, reject checksum mismatches, and
 have only their required permissions. GitHub artifact attestations cover the
-release checksums; npm and PyPI trusted publishing provide registry provenance.
+release checksums. npm provenance is requested for both authentication modes;
+PyPI uses trusted publishing and upload attestations.
 
 Rust publishing uses the [Cargo registry upload API][cargo-upload] to upload
 `.crate` files without repackaging them. Unchanged maintained crate versions are
 reused from crates.io before testing and assembly. Any source difference other
 than `.cargo_vcs_info.json` requires a version bump.
 
-## First npm and crates.io publication
+## Trusted publishing after the first publication
 
-For the first release, let the tag run reach its environment approvals. Download
-its final artifact, extract it outside the checkout or under `dist/`, and use a
-clean checkout of the exact commit recorded in `release.json`. Verify it with:
+After the first publishing run succeeds, revoke the temporary registry tokens
+and delete `CARGO_REGISTRY_TOKEN` and `NPM_TOKEN` from the GitHub environments.
+Configure GitHub Actions trusted publishing for all thirteen crates and all six
+npm packages before the next release:
 
-```sh
-python3 -m tools.release verify /path/to/release
-```
+| Field             | crates.io      | npm            |
+| ----------------- | -------------- | -------------- |
+| Owner             | `meltyshev`    | `meltyshev`    |
+| Repository        | `mikrio`       | `mikrio`       |
+| Workflow filename | `release.yaml` | `release.yaml` |
+| Environment       | `crates-io`    | `npm`          |
 
-After reviewing that bundle, log into npm interactively with a maintainer
-account that can publish `mikrio` and the `@mikrio` scope, then run:
+Use each crate's publishing settings and each npm package's **Settings ->
+Trusted publishing**. The workflow filename and environment are case-sensitive;
+enter the filename without `.github/workflows/`. On npm, allow direct publishing
+with **`npm publish`**; the default stage-only permission is insufficient.
 
-```sh
-python3 -m tools.publish npm /path/to/release
-```
+An npm trusted publisher expires if its first successful upload does not happen
+within two days. Configure or refresh it shortly before the next release.
+Skipping an already-published version does not exercise the trusted publisher.
+After enabling trust, select npm's **Require two-factor authentication and
+disallow tokens** package setting. crates.io also supports requiring trusted
+publishing for future uploads. PyPI converts the pending publisher
+automatically.
 
-For crates.io, create an expiring token with the permissions needed to create
-the listed crates. Supply it through `CARGO_REGISTRY_TOKEN` in the local process
-environment, without writing it into a file or command history, then run:
-
-```sh
-python3 -m tools.publish crates /path/to/release
-```
-
-Revoke that token immediately afterward. Configure trusted publishing for every
-new crate, then approve the waiting GitHub jobs. Already-uploaded versions are
-accepted only when their hashes match the bundle. Skipping an existing npm
-version does not exercise its trusted publisher: configure or refresh npm trust
-within two days before the first automated upload of a new version. PyPI uses
-its pending publisher directly and needs no manual token. Initial manual npm
-uploads do not acquire GitHub OIDC provenance retroactively; subsequent
-automated versions do. The release's GitHub artifact attestations still identify
-the bootstrap files.
+For subsequent releases, commit the new version and changelog, then run
+`publish` with `bootstrap` unchecked. No local publishing commands, manually
+created tags, or stored publishing tokens are required. See [npm trusted
+publishers][npm-trusted-publishers] and [crates.io trusted
+publishing][crates-io-trusted-publishing].
 
 ## Recover a partial publication
 
@@ -203,6 +258,10 @@ Use **Re-run failed jobs** on the same run. Successful build jobs and their
 artifact ID must be preserved. Do not rerun all jobs, move a tag, rebuild a
 published version, or overwrite an asset. Artifacts are retained for 90 days;
 download and preserve the final bundle before beginning publication.
+
+A new publishing run refuses an existing version tag. If credentials or
+environment settings were wrong, correct those settings and rerun the original
+run's failed jobs. The original run retains its mode, commit, and artifact ID.
 
 Each publisher compares existing registry hashes and uploads only missing files.
 A mismatch stops the release. An interrupted upload is not automatically
@@ -217,6 +276,11 @@ release.
 [pypi-pending-publishers]:
   https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/
 [npm-trusted-publishers]: https://docs.npmjs.com/trusted-publishers/
+[npm-tokens]: https://docs.npmjs.com/creating-and-viewing-access-tokens/
 [crates-io-trusted-publishing]: https://crates.io/docs/trusted-publishing
+[github-environments]:
+  https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments
+[github-rulesets]:
+  https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository
 [github-immutable-releases]:
-  https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases
+  https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/establish-provenance-and-integrity/prevent-release-changes

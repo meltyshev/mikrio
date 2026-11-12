@@ -83,13 +83,25 @@ def preflight() -> None:
     if os.environ.get("GITHUB_REPOSITORY") != REPOSITORY:
         raise ValueError("unexpected release repository")
 
-    event = os.environ.get("GITHUB_EVENT_NAME")
-    ref = os.environ.get("GITHUB_REF")
-    should_publish = event == "push" and ref == f"refs/tags/v{version}"
-    is_rehearsal = event == "workflow_dispatch" and ref == "refs/heads/main"
+    if (
+        os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+        or os.environ.get("GITHUB_REF") != "refs/heads/main"
+    ):
+        raise ValueError("run the release workflow from main")
 
-    if not should_publish and not is_rehearsal:
-        raise ValueError("use a matching version tag, or rehearse from main")
+    mode = os.environ.get("RELEASE_MODE", "rehearsal")
+    bootstrap = os.environ.get("RELEASE_BOOTSTRAP", "false")
+
+    if mode not in {"rehearsal", "publish"} or bootstrap not in {"true", "false"}:
+        raise ValueError("invalid release mode or bootstrap option")
+
+    should_publish = mode == "publish"
+
+    if bootstrap == "true" and not should_publish:
+        raise ValueError("bootstrap authentication requires publish mode")
+
+    if source_revision() != os.environ.get("GITHUB_SHA"):
+        raise ValueError("checkout differs from the workflow source")
 
     subprocess.run(
         ["git", "merge-base", "--is-ancestor", "HEAD", "origin/main"],
@@ -97,8 +109,24 @@ def preflight() -> None:
         check=True,
     )
 
+    if should_publish:
+        result = subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", f"refs/tags/v{version}"],
+            cwd=ROOT,
+            check=False,
+        )
+
+        if result.returncode == 0:
+            raise ValueError(
+                "release tag already exists; resume the original run's failed jobs"
+            )
+
+        if result.returncode != 1:
+            result.check_returncode()
+
     write_output("version", version)
     write_output("publish", str(should_publish).lower())
+    write_output("bootstrap", bootstrap)
 
 
 def is_safe_member_name(name: str) -> bool:
