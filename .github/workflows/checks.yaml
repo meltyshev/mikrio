@@ -190,7 +190,9 @@ jobs:
         run: python3 schema/verify.py
 
       - name: Test Python tooling
-        run: python3 -m unittest discover -s tools/tests
+        run: |
+          python3 -m unittest discover -s tools/tests
+          python3 -m unittest discover -s tests/ffi
 
       - name: Verify generated S3 code
         run: python3 -m tools.regenerate_s3s --check
@@ -298,6 +300,9 @@ jobs:
           version: 0.13.7
           python-version: 3.14.10
           enable-cache: false
+
+      - name: Test C consumer harness
+        run: uv run --no-project python -m unittest discover -s tests/ffi
 
       - name: Build C distribution
         run: uv run --no-project python -m tools.build ffi

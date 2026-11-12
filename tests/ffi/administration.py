@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import http.client
 import json
@@ -16,6 +17,7 @@ import time
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from contextlib import ExitStack
+from ctypes import wintypes
 from pathlib import Path
 from types import TracebackType
 from typing import Any, cast
@@ -23,6 +25,48 @@ from urllib.parse import urlsplit
 
 SELECTOR = "administration_changes_reach_live_peer_listener"
 BOOTSTRAP_SECRET = "synthetic-ffi-peer-secret"
+
+
+def windows_pipe_readable(descriptor: int, timeout: float) -> bool:
+    """Wait for bytes or EOF on an owned Windows pipe with one reader."""
+    import msvcrt
+
+    api = ctypes.WinDLL("kernel32", use_last_error=True)
+    peek = api.PeekNamedPipe
+
+    peek.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.DWORD),
+        ctypes.c_void_p,
+    ]
+
+    peek.restype = wintypes.BOOL
+    handle = msvcrt.get_osfhandle(descriptor)
+    deadline = time.monotonic() + timeout
+
+    while True:
+        available = wintypes.DWORD()
+
+        if not peek(handle, None, 0, None, ctypes.byref(available), None):
+            error = ctypes.get_last_error()
+
+            if error in {109, 232}:  # Broken pipe / closed writer: read observes EOF.
+                return True
+
+            raise ctypes.WinError(error)
+
+        if available.value:
+            return True
+
+        remaining = deadline - time.monotonic()
+
+        if remaining <= 0:
+            return False
+
+        time.sleep(min(remaining, 0.01))
 
 
 class Peer:
@@ -84,11 +128,10 @@ class Peer:
 
         with ExitStack() as stack:
             if os.name == "nt":
-                from tools.windows_process import pipe_readable
 
                 def readable(timeout: float) -> bool:
                     assert self.child.stdout is not None
-                    return pipe_readable(self.child.stdout.fileno(), timeout)
+                    return windows_pipe_readable(self.child.stdout.fileno(), timeout)
             else:
                 ready = stack.enter_context(selectors.DefaultSelector())
                 ready.register(self.child.stdout, selectors.EVENT_READ)

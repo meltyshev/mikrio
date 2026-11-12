@@ -54,6 +54,13 @@ below separately verify linking and runtime behavior against the C distribution.
 After dependency audits, a separate Windows job builds the C distribution with
 MSVC and runs those installed consumers alongside the Linux and macOS suites.
 
+The C administration harness also has subprocess protocol tests. Windows runs
+them before compiling the distribution so pipe failures surface early.
+
+```sh
+python3 -m unittest discover -s tests/ffi
+```
+
 ## Rust and schema tests
 
 ```sh
