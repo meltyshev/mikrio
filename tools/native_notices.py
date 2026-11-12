@@ -18,6 +18,7 @@ def generate(
     target: str,
     binding: str = "python",
     *,
+    offline: bool = False,
     cargo: Sequence[str] = ("cargo",),
     env: Mapping[str, str] | None = None,
 ) -> str:
@@ -39,9 +40,14 @@ def generate(
         for item in distributions
     }
 
+    flags = ["--locked"]
+
+    if offline:
+        flags.append("--offline")
+
     metadata = json.loads(
         subprocess.check_output(
-            [*cargo, "metadata", "--locked", "--offline", "--format-version", "1"],
+            [*cargo, "metadata", *flags, "--format-version", "1"],
             cwd=ROOT,
             encoding="utf-8",
             env=env,
@@ -55,8 +61,7 @@ def generate(
             [
                 *cargo,
                 "tree",
-                "--locked",
-                "--offline",
+                *flags,
                 "-p",
                 f"mikrio-{binding}",
                 "--target",
@@ -181,6 +186,7 @@ def main() -> int:
         "--binding", choices=["python", "node", "ffi", "cli"], default="python"
     )
 
+    parser.add_argument("--offline", action="store_true")
     parser.add_argument("--check", action="store_true")
     arguments = parser.parse_args()
 
@@ -192,7 +198,7 @@ def main() -> int:
     }
 
     path = ROOT / destinations[arguments.binding]
-    content = generate(arguments.target, arguments.binding)
+    content = generate(arguments.target, arguments.binding, offline=arguments.offline)
 
     if arguments.check:
         if path.read_text(encoding="utf-8") != content:

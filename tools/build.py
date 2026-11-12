@@ -212,12 +212,14 @@ def build_metadata(version: str, target: str, matrix: str) -> dict[str, Any]:
     }
 
 
-def write_package_documents(directory: Path, target: str, kind: str) -> None:
+def write_package_documents(
+    directory: Path, target: str, kind: str, offline: bool
+) -> None:
     shutil.copy2(ROOT / "LICENSE", directory / "LICENSE")
     shutil.copy2(ROOT / f"crates/mikrio-{kind}/README.md", directory / "README.md")
 
     (directory / "THIRD_PARTY_LICENSES.txt").write_text(
-        generate(target, kind), encoding="utf-8", newline="\n"
+        generate(target, kind, offline=offline), encoding="utf-8", newline="\n"
     )
 
 
@@ -229,7 +231,7 @@ def build_cli(
     with tempfile.TemporaryDirectory(prefix="mikrio-cli-") as temporary:
         stage = Path(temporary)
         retain_native(native, stage / binary_names(matrix)[0], runtime=runtime)
-        write_package_documents(stage, target, "cli")
+        write_package_documents(stage, target, "cli", offline)
         package_cli(stage, output, build_metadata(version, target, matrix))
 
 
@@ -283,7 +285,7 @@ def build_ffi(
         else:
             stage_link(stage / "lib", matrix)
 
-        write_package_documents(stage, target, "ffi")
+        write_package_documents(stage, target, "ffi", offline)
         package_ffi(stage, output, build_metadata(version, target, matrix))
 
 
@@ -324,7 +326,9 @@ def build_node(
         )
 
         (public / "THIRD_PARTY_LICENSES.txt").write_text(
-            generate("supported", "node"), encoding="utf-8", newline="\n"
+            generate("supported", "node", offline=offline),
+            encoding="utf-8",
+            newline="\n",
         )
 
         for name in ("LICENSE", "THIRD_PARTY_LICENSES.txt"):
