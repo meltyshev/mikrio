@@ -114,28 +114,7 @@ jobs:
 
       - name: Set up MSVC
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $installation = & $vswhere -latest -products '*' `
-            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-            -property installationPath
-
-          if (-not $installation) {
-            throw 'MSVC installation not found'
-          }
-
-          & "$installation\Common7\Tools\Launch-VsDevShell.ps1" `
-            -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
-
-          $variables = @(
-            'PATH', 'INCLUDE', 'LIB', 'LIBPATH', 'VCToolsInstallDir', 'WindowsSdkDir'
-          )
-
-          foreach ($name in $variables) {
-            "$name=$([Environment]::GetEnvironmentVariable($name))" |
-              Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          }
+        uses: ./.github/actions/setup-msvc
 
       - name: Set up Rust
         run: rustup show

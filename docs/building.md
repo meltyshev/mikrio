@@ -51,6 +51,8 @@ c++ -std=c++20 -Wall -Wextra -Werror -pthread -fsyntax-only \
 CI runs these checks before toolchain setup on Linux and macOS. They require
 only the checked-in headers and platform compilers. The installed consumer tests
 below separately verify linking and runtime behavior against the C distribution.
+After dependency audits, a separate Windows job builds the C distribution with
+MSVC and runs those installed consumers alongside the Linux and macOS suites.
 
 ## Rust and schema tests
 
@@ -103,7 +105,8 @@ pnpm exec eslint \
   examples/node/attachments/src examples/node/attachments/tests \
   tests/sdk/node/src --max-warnings 0
 pnpm exec prettier --check \
-  '.github/workflows/*.yaml' .github/renovate.json .prettierrc.json \
+  '.github/actions/**/*.yaml' '.github/workflows/*.yaml' \
+  .github/renovate.json .prettierrc.json \
   package.json pnpm-workspace.yaml eslint.config.mjs \
   'packages/*/*.json' 'examples/**/package.json' 'examples/**/tsconfig.json' \
   'tests/sdk/node/*.json' tests/sdk/node/pnpm-workspace.yaml \
@@ -188,6 +191,10 @@ install local archives into an isolated temporary consumer and run the ordinary
 package tests outside the checkout. `--test` selects a specific test file. Add
 `--probes` to the Python or Node.js command to compile and exercise the stream
 and diagnostic test extensions. Those extensions are test-only artifacts.
+
+The C consumer suite exercises absolute and relative store paths. Returned
+directories must be absolute and refer to the same filesystem identity because
+canonical paths can resolve aliases and use extended Windows path syntax.
 
 The Rust consumer extracts the source archives and substitutes them for the
 unpublished registry names. It verifies the selected third-party dependencies

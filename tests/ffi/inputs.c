@@ -1,4 +1,6 @@
+#define _DEFAULT_SOURCE 1
 #include "mikrio.h"
+#include "platform.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -490,8 +492,16 @@ int main(int argc, char **argv) {
 
   assert(original.reserved == 0 && current.reserved == 0);
 
-  assert(equals(original.directory, argv[1]) &&
-         equals(current.directory, argv[1]));
+  assert(test_directory_matches(original.directory.data, original.directory.len,
+                                argv[1]));
+
+  assert(test_directory_matches(current.directory.data, current.directory.len,
+                                argv[1]));
+
+  assert(original.directory.len == current.directory.len);
+
+  assert(memcmp(original.directory.data, current.directory.data,
+                original.directory.len) == 0);
 
   assert(equals(original.region, "eu-west-1") &&
          equals(current.region, "eu-west-1"));

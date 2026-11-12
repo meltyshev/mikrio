@@ -218,7 +218,8 @@ jobs:
       - name: Check formatting with Prettier
         run: |
           pnpm exec prettier --check \
-            '.github/workflows/*.yaml' .github/renovate.json .prettierrc.json \
+            '.github/actions/**/*.yaml' '.github/workflows/*.yaml' \
+            .github/renovate.json .prettierrc.json \
             package.json pnpm-workspace.yaml eslint.config.mjs \
             'packages/*/*.json' 'examples/**/package.json' 'examples/**/tsconfig.json' \
             'tests/sdk/node/*.json' tests/sdk/node/pnpm-workspace.yaml \
@@ -264,6 +265,45 @@ jobs:
           python3 -m tools.test_bindings node "dist/mikrio-$release_version.tgz" --native "$native"
           python3 -m tools.test_bindings attachments "dist/mikrio-$release_version.tgz" --native "$native"
           python3 -m tools.test_ffi dist/mikrio-c-*.tar.gz --go go
+
+      - name: Verify clean working tree
+        run: |
+          working_tree_status=$(git status --porcelain)
+          test -z "$working_tree_status"
+
+  windows-ffi:
+    name: Build and test Windows C distribution
+    needs: dependencies
+    if: github.event_name != 'schedule'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up MSVC
+        uses: ./.github/actions/setup-msvc
+
+      - name: Set up Rust
+        run: rustup show
+
+      - name: Set up Python and uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: 0.13.7
+          python-version: 3.14.10
+          enable-cache: false
+
+      - name: Build C distribution
+        run: uv run --no-project python -m tools.build ffi
+
+      - name: Test installed C distribution
+        run: uv run --no-project python -m tools.test_ffi dist/mikrio-c-*.tar.gz
 
       - name: Verify clean working tree
         run: |

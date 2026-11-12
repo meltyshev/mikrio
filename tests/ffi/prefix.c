@@ -1,3 +1,5 @@
+#define _DEFAULT_SOURCE 1
+#include "platform.h"
 #include "prefix.h"
 #include <assert.h>
 #include <stdio.h>
@@ -38,8 +40,10 @@ int main(int argc, char **argv) {
   assert(observed.before == UINT64_MAX && observed.after == UINT64_MAX);
   assert(observed.view.region.len == 9);
   assert(memcmp(observed.view.region.data, "us-east-1", 9) == 0);
-  assert(observed.view.directory.len == strlen(argv[1]));
-  assert(memcmp(observed.view.directory.data, argv[1], strlen(argv[1])) == 0);
+
+  assert(test_directory_matches(observed.view.directory.data,
+                                observed.view.directory.len, argv[1]));
+
   mikrio_v1_info_release(info);
   mikrio_v1_error_release(error);
   puts("PASS separately_compiled_prefix_and_fixed_return");

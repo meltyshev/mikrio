@@ -129,10 +129,13 @@ def main() -> None:
             ).fetchone()[0]
 
         run([programs["prefix"], str(store)], installed, env)
+        # A canonical directory may have a different spelling than its input.
+        run([programs["prefix"], os.path.relpath(store, installed)], installed, env)
         run([programs["ownership"], str(store), owner], installed, env)
 
         for name in ("inputs", "owner_options", "multipart"):
-            run([programs[name], str(directory / (name + "-store"))], installed, env)
+            store = directory / (name + "-store")
+            run([programs[name], os.path.relpath(store, installed)], installed, env)
 
         run(
             [programs["extended"], str(directory / "extended-store"), "current"],

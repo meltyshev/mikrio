@@ -23,7 +23,7 @@ struct test_thread_entry {
   void *argument;
 };
 
-static unsigned __stdcall test_thread_entry(void *opaque) {
+static inline unsigned __stdcall test_thread_entry(void *opaque) {
   struct test_thread_entry entry = *(struct test_thread_entry *)opaque;
   free(opaque);
   entry.function(entry.argument);
@@ -119,6 +119,43 @@ static inline void test_guard_pages_release(uint8_t *mapping, size_t page) {
   assert(VirtualFree(mapping, 0, MEM_RELEASE));
 }
 
+static inline BY_HANDLE_FILE_INFORMATION
+test_read_directory_information(const char *directory) {
+  int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, directory, -1,
+                                  NULL, 0);
+
+  assert(count > 0);
+  wchar_t *path = malloc((size_t)count * sizeof(wchar_t));
+  assert(path != NULL);
+
+  assert(MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, directory, -1, path,
+                             count) == count);
+
+  HANDLE handle =
+      CreateFileW(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                  NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+
+  free(path);
+  assert(handle != INVALID_HANDLE_VALUE);
+  BY_HANDLE_FILE_INFORMATION information;
+  assert(GetFileInformationByHandle(handle, &information));
+  assert(CloseHandle(handle));
+  assert(information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY);
+  return information;
+}
+
+static inline int test_same_directory(const char *actual, const char *expected) {
+  BY_HANDLE_FILE_INFORMATION actual_info =
+      test_read_directory_information(actual);
+
+  BY_HANDLE_FILE_INFORMATION expected_info =
+      test_read_directory_information(expected);
+
+  return actual_info.dwVolumeSerialNumber == expected_info.dwVolumeSerialNumber &&
+         actual_info.nFileIndexHigh == expected_info.nFileIndexHigh &&
+         actual_info.nFileIndexLow == expected_info.nFileIndexLow;
+}
+
 static inline void test_truncate_payload(const char *directory) {
   wchar_t root[4096], pattern[4096], path[4096], selected[4096];
 
@@ -177,6 +214,7 @@ static inline void test_truncate_payload(const char *directory) {
 #include <glob.h>
 #include <pthread.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -277,6 +315,15 @@ static inline void test_guard_pages_release(uint8_t *mapping, size_t page) {
   assert(munmap(mapping, 2 * page) == 0);
 }
 
+static inline int test_same_directory(const char *actual, const char *expected) {
+  struct stat actual_info, expected_info;
+  assert(stat(actual, &actual_info) == 0 && S_ISDIR(actual_info.st_mode));
+  assert(stat(expected, &expected_info) == 0 && S_ISDIR(expected_info.st_mode));
+
+  return actual_info.st_dev == expected_info.st_dev &&
+         actual_info.st_ino == expected_info.st_ino;
+}
+
 static inline void test_truncate_payload(const char *directory) {
   char pattern[4096];
   int length = snprintf(pattern, sizeof(pattern), "%s/objects/*/*", directory);
@@ -288,4 +335,30 @@ static inline void test_truncate_payload(const char *directory) {
   globfree(&matches);
 }
 #endif
+
+static inline int test_directory_matches(const uint8_t *data, uint64_t length,
+                                         const char *expected) {
+  assert(data != NULL && length > 0 && length < SIZE_MAX);
+  assert(memchr(data, '\0', (size_t)length) == NULL);
+#ifdef _WIN32
+  assert(length >= 3);
+
+  assert((data[1] == ':' && (data[2] == '\\' || data[2] == '/')) ||
+         ((data[0] == '\\' || data[0] == '/') &&
+          (data[1] == '\\' || data[1] == '/')));
+#else
+  assert(data[0] == '/');
+#endif
+
+  char *actual = malloc((size_t)length + 1);
+  assert(actual != NULL);
+  memcpy(actual, data, (size_t)length);
+  actual[(size_t)length] = '\0';
+
+  /* Canonical paths may use extended Windows syntax or resolve an alias. */
+  int matches = test_same_directory(actual, expected);
+  free(actual);
+  return matches;
+}
+
 #endif
