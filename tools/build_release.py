@@ -29,6 +29,11 @@ def invoke(*arguments: str) -> None:
 def audit_linux_wheel(path: Path, target: str) -> Path:
     """Audit the final wheel without allowing native companion rewrites."""
     platform = "manylinux_2_28_" + ("aarch64" if target == "linux-arm64" else "x86_64")
+    distribution, version, _ = path.name.split("-", 2)
+
+    metadata_members = {
+        f"{distribution}-{version}.dist-info/{name}" for name in ("WHEEL", "RECORD")
+    }
 
     with tempfile.TemporaryDirectory(prefix="mikrio-auditwheel-") as temporary:
         run(
@@ -50,26 +55,39 @@ def audit_linux_wheel(path: Path, target: str) -> Path:
             raise ValueError("auditwheel did not produce exactly one wheel")
 
         with zipfile.ZipFile(path) as original, zipfile.ZipFile(wheels[0]) as repaired:
+            # Repacking adds directory entries; only file contents are payloads.
             before = {
-                name: original.read(name)
-                for name in original.namelist()
-                if not name.endswith(("/WHEEL", "/RECORD"))
+                member.filename: original.read(member)
+                for member in original.infolist()
+                if not member.is_dir() and member.filename not in metadata_members
             }
 
             after = {
-                name: repaired.read(name)
-                for name in repaired.namelist()
-                if not name.endswith(("/WHEEL", "/RECORD"))
+                member.filename: repaired.read(member)
+                for member in repaired.infolist()
+                if not member.is_dir() and member.filename not in metadata_members
             }
 
             if before != after:
+                added = sorted(after.keys() - before.keys())
+                removed = sorted(before.keys() - after.keys())
+
+                changed = sorted(
+                    name
+                    for name in before.keys() & after.keys()
+                    if before[name] != after[name]
+                )
+
                 raise ValueError(
-                    "auditwheel changed native bytes or companion identity"
+                    "auditwheel changed wheel payload: "
+                    f"added={added}, removed={removed}, changed={changed}"
                 )
 
         destination = path.parent / wheels[0].name
-        path.unlink()
         shutil.copyfile(wheels[0], destination)
+
+        if destination != path:
+            path.unlink()
 
     return destination
 

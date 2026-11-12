@@ -252,19 +252,7 @@ def build_ffi(
         )
 
         if matrix == "windows-x86_64":
-            exported = run(["dumpbin.exe", "/nologo", "/exports", str(native)])
-            symbols = sorted(set(re.findall(r"\b(mikrio_v1_\w+)\s*$", exported, re.M)))
-
-            declared = set(
-                re.findall(
-                    r"\b(mikrio_v1_\w+)\s*\(",
-                    (stage / "include/mikrio.h").read_text(encoding="utf-8"),
-                )
-            )
-
-            if set(symbols) != declared:
-                raise ValueError("C export table differs from the public header")
-
+            symbols = read_windows_exports(native, stage / "include/mikrio.h")
             definition = stage / "mikrio.def"
 
             definition.write_text(
@@ -287,6 +275,51 @@ def build_ffi(
 
         write_package_documents(stage, target, "ffi", offline)
         package_ffi(stage, output, build_metadata(version, target, matrix))
+
+
+def read_windows_exports(native: Path, header: Path) -> list[str]:
+    """Verify the DLL export names before generating its import library."""
+    exported = run(["dumpbin.exe", "/nologo", "/exports", str(native)])
+
+    # Read the name column, before any alias or debug-symbol annotation.
+    symbols = re.findall(
+        r"^[ \t]+\d+[ \t]+[0-9A-Fa-f]+[ \t]+[0-9A-Fa-f]+[ \t]+(\S+)",
+        exported,
+        re.M,
+    )
+
+    declared = set(
+        re.findall(r"\b(mikrio_v1_\w+)\s*\(", header.read_text(encoding="utf-8"))
+    )
+
+    # Account for every entry, including unnamed or unparsed exports.
+    reported_counts = [
+        int(count)
+        for count in re.findall(
+            r"^[ \t]+(\d+)[ \t]+number of (?:functions|names)[ \t]*\r?$",
+            exported,
+            re.M,
+        )
+    ]
+
+    if (
+        not declared
+        or set(symbols) != declared
+        or len(symbols) != len(declared)
+        or reported_counts != [len(declared), len(declared)]
+    ):
+        print(exported, end="", file=sys.stderr)
+        missing = sorted(declared - set(symbols))
+        unexpected = sorted(set(symbols) - declared)
+
+        raise ValueError(
+            "C export table differs from the public header: "
+            f"missing={missing}, unexpected={unexpected}, "
+            f"expected_count={len(declared)}, parsed_count={len(symbols)}, "
+            f"reported_counts={reported_counts}"
+        )
+
+    return sorted(symbols)
 
 
 def build_node(

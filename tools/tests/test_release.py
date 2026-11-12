@@ -10,6 +10,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -29,6 +30,51 @@ def write_archive(path: Path, members: list[tuple[str, bytes]]) -> None:
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_repacked_linux_wheels_accept_directory_entries_during_assembly(
+        self,
+    ) -> None:
+        for target, architecture, machine in (
+            ("linux-arm64", "aarch64", 183),
+            ("linux-x86_64", "x86_64", 62),
+        ):
+            with (
+                self.subTest(target=target),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                path = (
+                    Path(temporary)
+                    / f"mikrio-0.1.0-cp312-abi3-manylinux_2_28_{architecture}.whl"
+                )
+                payload = bytearray(64)
+                payload[:6] = b"\x7fELF\x02\x01"
+                struct.pack_into("<H", payload, 18, machine)
+                metadata_prefix = "mikrio-0.1.0.dist-info/"
+
+                contents = {
+                    "mikrio/": b"",
+                    "mikrio/__init__.py": b"",
+                    "mikrio/__init__.pyi": b"",
+                    "mikrio/py.typed": b"",
+                    "mikrio/THIRD_PARTY_LICENSES.txt": b"notices",
+                    "mikrio/_native.abi3.so": bytes(payload),
+                    "mikrio/libmikrio_sqlite3.so": bytes(payload),
+                    metadata_prefix: b"",
+                    metadata_prefix + "METADATA": b"Name: mikrio\nVersion: 0.1.0\n",
+                    metadata_prefix + "WHEEL": b"audited tags",
+                    metadata_prefix + "RECORD": b"audited records",
+                    metadata_prefix + "licenses/": b"",
+                    metadata_prefix + "licenses/LICENSE": b"license",
+                }
+
+                with zipfile.ZipFile(path, "w") as archive:
+                    for name, content in contents.items():
+                        archive.writestr(name, content)
+
+                self.assertEqual(
+                    release.inspect_wheel(path, "0.1.0"),
+                    {"kind": "pypi", "name": "mikrio", "target": target},
+                )
+
     def test_native_npm_package_requires_matching_receipt_and_libc(self) -> None:
         payload = bytearray(64)
         payload[:6] = b"\x7fELF\x02\x01"

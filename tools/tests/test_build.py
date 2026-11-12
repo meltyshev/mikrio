@@ -1,15 +1,92 @@
-"""Source builds preserve the Git inventory and local dependency order."""
+"""Builds preserve native exports, source inventory, and dependency order."""
 
 from __future__ import annotations
 
+import io
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 from tools import build
+
+
+class WindowsExportTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.header = self.root / "mikrio.h"
+
+        self.header.write_text(
+            "void mikrio_v1_first(void);\nvoid mikrio_v1_second(void);\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+
+    def test_export_names_are_independent_of_alias_annotations_and_line_endings(
+        self,
+    ) -> None:
+        for annotation in ("", " = mikrio_v1_first", " = implementation (void)"):
+            for newline in ("\n", "\r\n"):
+                with self.subTest(annotation=annotation, newline=newline):
+                    output = newline.join(
+                        [
+                            "          2 number of functions",
+                            "          2 number of names",
+                            "    ordinal hint RVA      name",
+                            "          1    0 00001000 mikrio_v1_first",
+                            "          2    1 00001000 mikrio_v1_second" + annotation,
+                            "",
+                            "  Summary",
+                            "        1000 .text",
+                        ]
+                    )
+
+                    with patch.object(build, "run", return_value=output):
+                        self.assertEqual(
+                            build.read_windows_exports(
+                                self.root / "mikrio.dll", self.header
+                            ),
+                            ["mikrio_v1_first", "mikrio_v1_second"],
+                        )
+
+    def test_incomplete_or_mismatched_export_tables_are_rejected(self) -> None:
+        valid = (
+            "          2 number of functions\n"
+            "          2 number of names\n"
+            "          1    0 00001000 mikrio_v1_first\n"
+            "          2    1 00002000 mikrio_v1_second\n"
+        )
+
+        cases = {
+            "missing": "          1    0 00001000 mikrio_v1_first\n",
+            "extra": valid + "          3    2 00003000 unexpected_export\n",
+            "duplicate": valid + "          3    2 00003000 mikrio_v1_first\n",
+            "annotation_only": "          1    0 00001000 mikrio_v1_first = mikrio_v1_second\n",
+            "unparsed_export": valid.replace("2 number", "3 number")
+            + "          3    2          unexpected_export (forwarded to other.function)\n",
+            "unnamed_export": valid.replace(
+                "2 number of functions", "3 number of functions"
+            ),
+            "missing_counts": "\n".join(valid.splitlines()[2:]),
+        }
+
+        for name, output in cases.items():
+            diagnostics = io.StringIO()
+
+            with (
+                self.subTest(name=name),
+                patch.object(build, "run", return_value=output),
+                redirect_stderr(diagnostics),
+            ):
+                with self.assertRaisesRegex(ValueError, "C export table differs"):
+                    build.read_windows_exports(self.root / "mikrio.dll", self.header)
+
+                self.assertEqual(diagnostics.getvalue(), output)
 
 
 class SourceArchiveTests(unittest.TestCase):

@@ -138,12 +138,17 @@ the five triples in the [support guide](../SUPPORT.md#platforms). The
 appropriate linker, SDK, and target toolchain must be installed; specifying a
 target does not provision a cross-compiler or establish native execution.
 Windows C packaging runs in the MSVC developer environment to generate the
-import library for `mikrio.dll`.
+import library for `mikrio.dll`. The DLL export-name column must match the
+public header exactly; alias annotations are not additional exported names.
+Mismatches report the export table and missing or unexpected symbols.
 
 Linux wheels for PyPI must be built and checked against an actual manylinux
 baseline. Pass its validated tag with `--compatibility`; do not relabel an
 arbitrary Linux build to imply an older glibc floor. Keep the shared SQLite
-loader identity when inspecting or repairing native dependencies.
+loader identity when inspecting or repairing native dependencies. Release
+auditing permits ZIP directory entries and updates to the wheel's `WHEEL` and
+`RECORD` metadata, but rejects added, removed, renamed, or changed payload
+files.
 
 The Node.js build requires the contributor dependencies and invokes `npm pack`
 with scripts disabled. The Python build invokes the locked maturin version. Rust
