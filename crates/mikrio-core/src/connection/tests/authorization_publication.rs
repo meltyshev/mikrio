@@ -1,6 +1,5 @@
 //! Order authorization changes against payload publication and metadata commit.
 
-use std::io::BufRead as _;
 use std::path::Path;
 
 use super::objects::{put, read};
@@ -19,17 +18,6 @@ fn announce(value: &str) -> io::Result<()> {
     let mut output = io::stdout().lock();
     writeln!(output, "PROBE {value}")?;
     output.flush()
-}
-
-fn control() -> io::Result<()> {
-    let mut line = String::new();
-    io::stdin().lock().read_line(&mut line)?;
-
-    if line != "exit\n" {
-        return Err(io::Error::other("owned authorization control closed"));
-    }
-
-    Ok(())
 }
 
 fn checkpoint(point: &str) -> io::Result<()> {
@@ -59,7 +47,7 @@ fn checkpoint(point: &str) -> io::Result<()> {
     }
 
     announce("PUBLICATION_PAUSED")?;
-    control()
+    process::read_exit()
 }
 
 fn blob_path(path: &Path, blob: BlobId) -> PathBuf {
@@ -285,7 +273,7 @@ fn authorization_process_child() -> TestResult {
             crate::protocol_fault::install(checkpoint)?;
             connection.delete_access_key(principal, key).await?;
             announce("REVOCATION_COMMITTED")?;
-            control()?;
+            process::wait_for_exit().await?;
             connection.close().await?;
             return Ok(());
         }

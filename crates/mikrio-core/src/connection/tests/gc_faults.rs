@@ -1,7 +1,6 @@
 //! Process interruption at real collector effects; not a storage power-cut lane.
 
 use std::fmt::Write as _;
-use std::io::BufRead as _;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
@@ -56,24 +55,13 @@ fn checkpoint(point: &str) -> io::Result<()> {
 
     announce("CHECKPOINT")?;
     FIRED.store(true, Ordering::SeqCst);
-    control()
+    process::read_exit()
 }
 
 fn announce(value: &str) -> io::Result<()> {
     let mut output = io::stdout().lock();
     writeln!(output, "PROBE {value}")?;
     output.flush()
-}
-
-fn control() -> io::Result<()> {
-    let mut line = String::new();
-    io::stdin().lock().read_line(&mut line)?;
-
-    if line != "exit\n" {
-        return Err(io::Error::other("test control pipe closed"));
-    }
-
-    Ok(())
 }
 
 fn blob_path(path: &Path, tree: &str, blob_id: BlobId) -> PathBuf {
@@ -461,7 +449,7 @@ fn collector_fault_child() -> TestResult {
             assert_eq!(error.outcome(), expected);
 
             announce("SETTLED")?;
-            control()?;
+            process::wait_for_exit().await?;
         } else {
             result?;
         }

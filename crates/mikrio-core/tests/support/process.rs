@@ -21,6 +21,42 @@ pub(crate) fn process_scenario() -> io::Result<MutexGuard<'static, ()>> {
         .map_err(|_| io::Error::other("another process scenario failed"))
 }
 
+pub(crate) fn read_exit() -> io::Result<()> {
+    let mut line = String::new();
+    io::stdin().lock().read_line(&mut line)?;
+
+    if line != "exit\n" {
+        return Err(io::Error::other("test control pipe closed"));
+    }
+
+    Ok(())
+}
+
+#[allow(
+    dead_code,
+    reason = "only storage probe children await parent input while owning runtime work"
+)]
+pub(crate) async fn wait_for_exit() -> io::Result<()> {
+    // Parent input cannot occupy the runtime or its finite native pool: either
+    // may own cleanup needed before the parent can send exit. The owned child
+    // process bounds this reader; its parent closes the pipe or reaps the child.
+    let (reply, response) = tokio::sync::oneshot::channel();
+
+    let reader = std::thread::Builder::new()
+        .name("native-probe-input".into())
+        .spawn(move || {
+            let _delivery = reply.send(read_exit());
+        })?;
+
+    let result = response.await;
+
+    reader
+        .join()
+        .map_err(|_| io::Error::other("probe input reader panicked"))?;
+
+    result.map_err(|_| io::Error::other("probe input reader stopped"))?
+}
+
 pub(crate) struct Probe {
     child: Child,
     observations: Receiver<io::Result<String>>,

@@ -1,6 +1,5 @@
 //! Independent-process persistent flows and real native read ownership barriers.
 
-use std::io::BufRead as _;
 use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::task::Context as TaskContext;
@@ -12,6 +11,8 @@ use super::*;
 use crate::object::BucketName;
 use crate::test_process as process;
 use crate::{BlobId, OperationFailure};
+
+mod control;
 
 const CHILD: &str = "connection::tests::processes::object_process_child";
 static READ_BLOCKED: AtomicBool = AtomicBool::new(false);
@@ -143,7 +144,7 @@ fn pause_native_read(point: &str) -> io::Result<()> {
 
     announce("NATIVE_READ_BLOCKED")?;
     READ_BLOCKED.store(true, Ordering::SeqCst);
-    control()
+    process::read_exit()
 }
 
 async fn cancel_native_read(connection: &Connection, part: bool) -> TestResult {
@@ -394,17 +395,6 @@ fn announce(value: &str) -> io::Result<()> {
     output.flush()
 }
 
-fn control() -> io::Result<()> {
-    let mut line = String::new();
-    io::stdin().lock().read_line(&mut line)?;
-
-    if line != "exit\n" {
-        return Err(io::Error::other("test control pipe closed"));
-    }
-
-    Ok(())
-}
-
 struct PausedSource;
 
 impl AsyncRead for PausedSource {
@@ -415,7 +405,7 @@ impl AsyncRead for PausedSource {
     ) -> Poll<io::Result<()>> {
         // The owned child is deliberately killed with this callback blocked.
         // Reservation and staging file creation have completed before the first pull.
-        Poll::Ready(announce("SOURCE_BLOCKED").and_then(|()| control()))
+        Poll::Ready(announce("SOURCE_BLOCKED").and_then(|()| process::read_exit()))
     }
 }
 
@@ -453,13 +443,13 @@ fn object_process_child() -> TestResult {
                 );
 
                 announce("PROGRESSED")?;
-                control()?;
+                process::wait_for_exit().await?;
             }
             "reader" => {
                 let (selected, mut body) = connection.get_object(read("selected")).await?;
                 assert_eq!(body.read_chunk(8).await?, Some(b"original".to_vec()));
                 announce(&selected.blob_id.to_string())?;
-                control()?;
+                process::wait_for_exit().await?;
                 assert_eq!(body.read_all(100).await?, b" process bytes");
 
                 assert_eq!(

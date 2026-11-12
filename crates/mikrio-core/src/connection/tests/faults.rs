@@ -1,6 +1,5 @@
 //! Write interruption and I/O failures with subprocess barriers.
 
-use std::io::BufRead as _;
 use std::sync::atomic::AtomicBool;
 
 use super::objects::{put, read};
@@ -23,7 +22,7 @@ fn checkpoint(point: &str) -> io::Result<()> {
 
     if kind == "ordered-unknown" && point == target {
         announce("CHECKPOINT")?;
-        return control();
+        return process::read_exit();
     }
 
     if matches!(kind, "unavailable" | "witness" | "ordered-unknown") {
@@ -47,7 +46,7 @@ fn checkpoint(point: &str) -> io::Result<()> {
         }
 
         announce("CHECKPOINT")?;
-        control()?;
+        process::read_exit()?;
 
         return if kind == "unavailable" {
             Err(io::Error::other("authoritative witness read unavailable"))
@@ -65,24 +64,13 @@ fn checkpoint(point: &str) -> io::Result<()> {
     }
 
     announce("CHECKPOINT")?;
-    control()
+    process::read_exit()
 }
 
 fn announce(value: &str) -> io::Result<()> {
     let mut output = io::stdout().lock();
     writeln!(output, "PROBE {value}")?;
     output.flush()
-}
-
-fn control() -> io::Result<()> {
-    let mut line = String::new();
-    io::stdin().lock().read_line(&mut line)?;
-
-    if line != "exit\n" {
-        return Err(io::Error::other("test control pipe closed"));
-    }
-
-    Ok(())
 }
 
 pub(super) fn object_state(
@@ -460,7 +448,7 @@ fn publication_fault_child() -> TestResult {
                 }
             }
 
-            control()?;
+            process::wait_for_exit().await?;
         } else if mode.starts_with("witness:") {
             assert!(FIRED.load(Ordering::SeqCst));
             result?;
@@ -476,7 +464,7 @@ fn publication_fault_child() -> TestResult {
                 }
             }
 
-            control()?;
+            process::wait_for_exit().await?;
         } else {
             result?;
         }
