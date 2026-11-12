@@ -127,6 +127,10 @@ explicitly to avoid selecting the parser's compiler version by accident.
 The build tool stages real Cargo outputs and their matching SQLite companion,
 then checks native archive contents. It does not publish anything.
 
+Supplemental license texts in `vendor/licenses/` are verified against their
+reviewed SHA-256 digests. Git attributes preserve their exact bytes during
+checkout, including on Windows with automatic line-ending conversion enabled.
+
 ```sh
 python3 -m tools.build cli
 python3 -m tools.build ffi

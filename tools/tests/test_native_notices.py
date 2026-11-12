@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path, PureWindowsPath
 from unittest.mock import patch
 
 from tools import native_notices
+from tools.artifacts import ROOT, digest
 
 
 class NativeNoticesTests(unittest.TestCase):
@@ -70,3 +73,41 @@ class NativeNoticesTests(unittest.TestCase):
         )
 
         self.assertEqual(self.generate(), expected)
+
+
+class ReviewedLicenseTests(unittest.TestCase):
+    def test_reviewed_license_bytes_survive_windows_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            checkout = Path(temporary)
+            licenses = checkout / "vendor/licenses"
+            shutil.copytree(ROOT / "vendor/licenses", licenses)
+            attributes = ROOT / ".gitattributes"
+
+            if attributes.is_file():
+                shutil.copy2(attributes, checkout / attributes.name)
+
+            sources = json.loads(
+                (licenses / "sources.json").read_text(encoding="utf-8")
+            )
+
+            subprocess.run(["git", "init", "--quiet"], cwd=checkout, check=True)
+
+            subprocess.run(
+                ["git", "-c", "core.autocrlf=false", "add", "."],
+                cwd=checkout,
+                check=True,
+            )
+
+            shutil.rmtree(licenses)
+
+            subprocess.run(
+                ["git", "-c", "core.autocrlf=true", "checkout-index", "--all"],
+                cwd=checkout,
+                check=True,
+            )
+
+            for package, supplement in sources.items():
+                with self.subTest(package=package):
+                    self.assertEqual(
+                        digest(checkout / supplement["path"]), supplement["sha256"]
+                    )

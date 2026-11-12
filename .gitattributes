@@ -1,0 +1,2 @@
+# Reviewed license digests require the exact upstream bytes on every platform.
+vendor/licenses/** -text
