@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     uint64_t before;
     mikrio_v1_info_view_t view;
     uint64_t after;
-  } observed = {UINT64_MAX, {0}, UINT64_MAX};
+  } observed = {.before = UINT64_MAX, .after = UINT64_MAX};
 
   observed.view = mikrio_v1_info_view(info);
   assert(observed.before == UINT64_MAX && observed.after == UINT64_MAX);

@@ -37,6 +37,21 @@ inputs are cached. The workspace disables npm lifecycle scripts. Native npm
 packages are intentionally excluded from source-workspace dependency resolution;
 the installed-package tests select locally built archives explicitly.
 
+## C and C++ checks
+
+```sh
+for source in tests/ffi/*.c; do
+  cc -std=c11 -Wall -Wextra -Werror -pthread -fsyntax-only \
+    -I crates/mikrio-ffi/include "$source"
+done
+c++ -std=c++20 -Wall -Wextra -Werror -pthread -fsyntax-only \
+  -I crates/mikrio-ffi/include tests/ffi/layout.cpp
+```
+
+CI runs these checks before toolchain setup on Linux and macOS. They require
+only the checked-in headers and platform compilers. The installed consumer tests
+below separately verify linking and runtime behavior against the C distribution.
+
 ## Rust and schema tests
 
 ```sh

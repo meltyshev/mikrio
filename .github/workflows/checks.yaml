@@ -108,6 +108,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check C and C++ consumers
+        run: |
+          for source in tests/ffi/*.c; do
+            cc -std=c11 -Wall -Wextra -Werror -pthread -fsyntax-only \
+              -I crates/mikrio-ffi/include "$source"
+          done
+          c++ -std=c++20 -Wall -Wextra -Werror -pthread -fsyntax-only \
+            -I crates/mikrio-ffi/include tests/ffi/layout.cpp
+
       - name: Set up Rust
         run: rustup show
 
