@@ -157,7 +157,7 @@ jobs:
         run: |
           uv sync --project packages/python --locked --group build --no-install-project --no-build
           uv sync --project tests/sdk/python --locked --no-install-project --no-build
-          echo "PYO3_PYTHON=$(uv python find)" >> "$GITHUB_ENV"
+          echo "PYO3_PYTHON=$(uv python find "$UV_PYTHON")" >> "$GITHUB_ENV"
 
       - name: Check Rust formatting with rustfmt
         run: cargo fmt -- --check

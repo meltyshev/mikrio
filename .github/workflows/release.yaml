@@ -245,7 +245,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          python_interpreter=$(uv python find)
+          python_interpreter=$(uv python find "$UV_PYTHON")
           "$python_interpreter" -m tools.test_bindings python dist/*.whl
           "$python_interpreter" -m tools.test_bindings node \
             "dist/mikrio-$RELEASE_VERSION.tgz" --native dist/mikrio-node-*.tgz
