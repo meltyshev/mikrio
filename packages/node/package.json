@@ -1,6 +1,6 @@
 {
-  "name": "mikrio",
-  "version": "0.1.0",
+  "name": "@mikrio/node",
+  "version": "0.1.1",
   "description": "Embedded object storage with an S3-compatible HTTP interface",
   "license": "Apache-2.0",
   "homepage": "https://github.com/meltyshev/mikrio#readme",
@@ -40,10 +40,10 @@
     "access": "public"
   },
   "optionalDependencies": {
-    "@mikrio/node-darwin-arm64": "0.1.0",
-    "@mikrio/node-darwin-x64": "0.1.0",
-    "@mikrio/node-linux-arm64-gnu": "0.1.0",
-    "@mikrio/node-linux-x64-gnu": "0.1.0",
-    "@mikrio/node-win32-x64-msvc": "0.1.0"
+    "@mikrio/node-darwin-arm64": "0.1.1",
+    "@mikrio/node-darwin-x64": "0.1.1",
+    "@mikrio/node-linux-arm64-gnu": "0.1.1",
+    "@mikrio/node-linux-x64-gnu": "0.1.1",
+    "@mikrio/node-win32-x64-msvc": "0.1.1"
   }
 }

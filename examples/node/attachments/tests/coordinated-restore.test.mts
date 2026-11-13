@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 import { Attachments } from "../src/attachments.mjs";
 import { loadConfig } from "../src/config.mjs";
 import { configureLocalPublication, initializeLocal } from "../src/local.mjs";

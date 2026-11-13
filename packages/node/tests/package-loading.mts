@@ -5,14 +5,19 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
 const require = createRequire(import.meta.url);
-const publicPackage = dirname(dirname(require.resolve("mikrio")));
+const publicPackage = dirname(dirname(require.resolve("@mikrio/node")));
 const controls = mkdtempSync(join(process.cwd(), "package-loading-"));
 
 // These are isolated copies of the installed wrapper. The sentinel is never an
 // engine substitute: rejection must happen before its entry point executes.
-for (const scenario of ["missing", "wrong-version", "wrong-name"] as const) {
+for (const scenario of [
+  "missing",
+  "wrong-version",
+  "wrong-name",
+  "wrong-public-name",
+] as const) {
   const consumer = join(controls, scenario);
-  const publicCopy = join(consumer, "node_modules/mikrio");
+  const publicCopy = join(consumer, "node_modules/@mikrio/node");
   cpSync(publicPackage, publicCopy, { recursive: true });
 
   const childRequire = createRequire(join(publicCopy, "package.json"));
@@ -63,6 +68,14 @@ for (const scenario of ["missing", "wrong-version", "wrong-name"] as const) {
     const manifest: unknown = childRequire("./package.json");
     assert.ok(typeof manifest === "object" && manifest !== null);
     assert.ok("version" in manifest && typeof manifest.version === "string");
+
+    if (scenario === "wrong-public-name") {
+      writeFileSync(
+        join(publicCopy, "package.json"),
+        JSON.stringify({ ...manifest, name: "@mikrio/wrong-package" }),
+      );
+    }
+
     const native = join(consumer, "node_modules", name);
     mkdirSync(native, { recursive: true });
 
@@ -94,10 +107,10 @@ for (const scenario of ["missing", "wrong-version", "wrong-name"] as const) {
         import assert from "node:assert/strict";
         import { existsSync } from "node:fs";
         import { createRequire } from "node:module";
-        import { Store } from "mikrio";
+        import { Store } from "@mikrio/node";
 
         const require = createRequire(import.meta.url);
-        assert.equal(Store, require("mikrio").Store);
+        assert.equal(Store, require("@mikrio/node").Store);
 
         assert.equal(
           process.report

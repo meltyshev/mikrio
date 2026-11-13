@@ -15,7 +15,7 @@ doc = false
 
 [dependencies]
 clap.workspace = true
-mikrio = { version = "=0.1.0", path = "../mikrio" }
+mikrio = { version = "=0.1.1", path = "../mikrio" }
 serde.workspace = true
 serde_json.workspace = true
 time.workspace = true
@@ -33,7 +33,7 @@ hmac.workspace = true
 sha2.workspace = true
 
 [build-dependencies]
-mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+mikrio-build = { version = "=0.1.1", path = "../mikrio-build" }
 
 [lints]
 workspace = true

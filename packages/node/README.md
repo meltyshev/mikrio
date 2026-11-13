@@ -1,10 +1,10 @@
-# mikrio
+# @mikrio/node
 
 Embedded object storage for Node.js and TypeScript, with an optional
 S3-compatible HTTP listener.
 
 ```typescript
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 
 const store = await Store.open({ directory: "./storage" });
 

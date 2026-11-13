@@ -15,7 +15,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
 import { test, type TestContext } from "node:test";
-import { Store, StorageError } from "mikrio";
+import { Store, StorageError } from "@mikrio/node";
 
 const GUARD_HELPER_PATH = fileURLToPath(
   new URL("./native_guard.py", import.meta.url),
@@ -310,7 +310,7 @@ await test("independently loaded native images preserve each other's guards", as
           const { createRequire } = require("node:module");
           const { dirname, join } = require("node:path");
 
-          const packageRoot = dirname(dirname(require.resolve("mikrio")));
+          const packageRoot = dirname(dirname(require.resolve("@mikrio/node")));
 
           const replicaRoot = join(
             process.argv[1],
@@ -766,9 +766,9 @@ await test("ESM and CommonJS share classes and loading is offline and lazy", () 
         fs.mkdirSync = fail;
         net.Server.prototype.listen = fail;
         childProcess.spawn = fail;
-        const library = require("mikrio");
+        const library = require("@mikrio/node");
 
-        import("mikrio")
+        import("@mikrio/node")
           .then((esm) => {
             assert.equal(esm.Store, library.Store);
             assert.equal(esm.StorageError, library.StorageError);
@@ -796,7 +796,7 @@ await test("idle native connection does not pin process exit", async (testContex
       "--input-type=commonjs",
       "-e",
       `
-        require("mikrio")
+        require("@mikrio/node")
           .Store.open({ directory: process.argv[1] })
           .then((store) => {
             globalThis.retainedStore = store;
@@ -892,7 +892,7 @@ await test(
       `
         const { parentPort, workerData } = require("node:worker_threads");
 
-        require("mikrio")
+        require("@mikrio/node")
           .Store.open({ directory: workerData })
           .then((store) => {
             globalThis.retainedStore = store;
@@ -1097,7 +1097,7 @@ await test(
     const worker = new Worker(
       `
         const { parentPort, workerData } = require("node:worker_threads");
-        const { Store } = require("mikrio");
+        const { Store } = require("@mikrio/node");
         const pending = Store.open({ directory: workerData });
 
         pending

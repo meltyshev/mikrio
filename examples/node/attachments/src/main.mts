@@ -99,7 +99,7 @@ async function serve(config: Config, authoritative: boolean): Promise<void> {
   await using resources = new AsyncDisposableStack();
 
   if (config.local) {
-    const { Store } = await import("mikrio");
+    const { Store } = await import("@mikrio/node");
     const store = await Store.open({ directory: config.local.directory });
     resources.defer(() => store.close());
 

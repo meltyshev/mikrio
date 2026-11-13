@@ -770,7 +770,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "mikrio"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "mikrio-build",
  "mikrio-core",
@@ -781,11 +781,11 @@ dependencies = [
 
 [[package]]
 name = "mikrio-build"
-version = "0.1.0"
+version = "0.1.1"
 
 [[package]]
 name = "mikrio-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "hmac",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "mikrio-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64-simd",
  "crc-fast",
@@ -826,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "mikrio-embed"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "mikrio",
@@ -836,7 +836,7 @@ dependencies = [
 
 [[package]]
 name = "mikrio-ffi"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "mikrio",
  "mikrio-build",
@@ -845,7 +845,7 @@ dependencies = [
 
 [[package]]
 name = "mikrio-http"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "futures-util",
@@ -906,7 +906,7 @@ dependencies = [
 
 [[package]]
 name = "mikrio-node"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "mikrio",
@@ -921,7 +921,7 @@ dependencies = [
 
 [[package]]
 name = "mikrio-python"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytes",
  "mikrio",

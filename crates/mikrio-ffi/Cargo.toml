@@ -12,11 +12,11 @@ repository.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-mikrio = { version = "=0.1.0", path = "../mikrio", default-features = false, features = ["http"] }
-mikrio-embed = { version = "=0.1.0", path = "../mikrio-embed" }
+mikrio = { version = "=0.1.1", path = "../mikrio", default-features = false, features = ["http"] }
+mikrio-embed = { version = "=0.1.1", path = "../mikrio-embed" }
 
 [build-dependencies]
-mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+mikrio-build = { version = "=0.1.1", path = "../mikrio-build" }
 
 [lints]
 workspace = true

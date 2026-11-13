@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from tools.artifacts import ROOT
+from tools.node_packages import PUBLIC_PACKAGE_NAME
 
 
 def validate(value: str) -> str:
@@ -285,7 +286,7 @@ def prepare_updates(root: Path, version: str) -> dict[Path, str]:
 
     expected = {target["name"]: version for target in targets}
 
-    matches_native_targets = package["name"] == "mikrio" and set(
+    matches_native_targets = package["name"] == PUBLIC_PACKAGE_NAME and set(
         package["optionalDependencies"]
     ) == set(expected)
 

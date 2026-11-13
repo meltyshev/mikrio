@@ -18,7 +18,7 @@ import {
   setTimeout as delay,
 } from "node:timers/promises";
 import { test, type TestContext } from "node:test";
-import { Store, StorageError, type MutationOutcome } from "mikrio";
+import { Store, StorageError, type MutationOutcome } from "@mikrio/node";
 
 async function fixture(
   context: TestContext,

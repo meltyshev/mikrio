@@ -4,13 +4,13 @@ import { createHash } from "node:crypto";
 import { readFile, realpath, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { createInterface } from "node:readline";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 
 const directory = process.env["mikrio_fixture_store"];
 const session = process.env["mikrio_fixture_session"];
 assert.ok(directory && session);
 const require = createRequire(import.meta.url);
-const installed = await realpath(require.resolve("mikrio"));
+const installed = await realpath(require.resolve("@mikrio/node"));
 assert.ok(installed.startsWith((await realpath(process.cwd())) + "/"));
 
 if (process.argv[2] === "inspect") {

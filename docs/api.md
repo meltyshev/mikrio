@@ -11,7 +11,7 @@ write path.
 | -------- | --------------------------- | ----------------------------------- |
 | Rust     | `mikrio::Store`             | Async on the caller's Tokio runtime |
 | Python   | `mikrio.Store`              | Synchronous; context managers       |
-| Node.js  | `Store` from `mikrio`       | Promises and `AbortSignal`          |
+| Node.js  | `Store` from `@mikrio/node` | Promises and `AbortSignal`          |
 | C        | `mikrio_v1_*` in `mikrio.h` | Synchronous; owned handles          |
 
 Rust inputs use builders with private fields. Python operations use keyword-only

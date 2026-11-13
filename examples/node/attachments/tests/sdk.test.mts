@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 import {
   DeleteObjectCommand,
   PutObjectCommand,

@@ -206,7 +206,7 @@ importers:
         specifier: 3.1164.0
         version: 3.1164.0
     devDependencies:
-      mikrio:
+      '@mikrio/node':
         specifier: workspace:*
         version: link:../../../packages/node
 

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { Store, StorageError, type CorsRule } from "mikrio";
+import { Store, StorageError, type CorsRule } from "@mikrio/node";
 
 function failure(code: string, outcome?: string): (error: unknown) => boolean {
   return (error) => {

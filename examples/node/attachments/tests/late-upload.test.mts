@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
-import { Store, StorageError } from "mikrio";
+import { Store, StorageError } from "@mikrio/node";
 import { Attachments } from "../src/attachments.mjs";
 import { loadConfig } from "../src/config.mjs";
 import { initializeLocal } from "../src/local.mjs";

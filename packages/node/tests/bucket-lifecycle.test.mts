@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { Store, StorageError, type LifecycleRule } from "mikrio";
+import { Store, StorageError, type LifecycleRule } from "@mikrio/node";
 
 function failure(
   code: string,

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { parentPort, workerData } from "node:worker_threads";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 
 // The parent owns this fixture input and terminates the environment at a barrier.
 const input: unknown = workerData;

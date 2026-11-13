@@ -264,8 +264,8 @@ jobs:
           release_version=$(python3 -m tools.version show)
           uv run --project packages/python --no-sync python -m tools.test_bindings python dist/*.whl
           native=$(find dist -name "mikrio-node-*-$release_version.tgz")
-          python3 -m tools.test_bindings node "dist/mikrio-$release_version.tgz" --native "$native"
-          python3 -m tools.test_bindings attachments "dist/mikrio-$release_version.tgz" --native "$native"
+          python3 -m tools.test_bindings node "dist/mikrio-node-$release_version.tgz" --native "$native"
+          python3 -m tools.test_bindings attachments "dist/mikrio-node-$release_version.tgz" --native "$native"
           python3 -m tools.test_ffi dist/mikrio-c-*.tar.gz --go go
 
       - name: Verify clean working tree

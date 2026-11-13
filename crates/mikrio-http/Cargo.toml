@@ -15,7 +15,7 @@ getrandom.workspace = true
 http.workspace = true
 hyper.workspace = true
 hyper-util.workspace = true
-mikrio-core = { version = "=0.1.0", path = "../mikrio-core" }
+mikrio-core = { version = "=0.1.1", path = "../mikrio-core" }
 s3s.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["io-util", "net"] }
@@ -27,7 +27,7 @@ rusqlite.workspace = true
 serde_json.workspace = true
 
 [build-dependencies]
-mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+mikrio-build = { version = "=0.1.1", path = "../mikrio-build" }
 
 [lints]
 workspace = true

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspect } from "node:util";
 import { test } from "node:test";
-import { Store, StorageError } from "mikrio";
+import { Store, StorageError } from "@mikrio/node";
 
 const POLICY =
   '{ "Version":"2012-10-17", "Statement":{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::photos/*"}}';

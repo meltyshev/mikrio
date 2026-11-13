@@ -1,7 +1,7 @@
 # Attachment example
 
 A Node.js and TypeScript application with local accounts, a browser UI, verified
-uploads, and background cleanup. It uses the public `mikrio` package to
+uploads, and background cleanup. It uses the public `@mikrio/node` package to
 provision local storage and the AWS SDK for object operations. Uploads keep
 their original key when attached; finalization requires no copy or second
 upload.
@@ -18,7 +18,7 @@ node node_modules/typescript-compiler/bin/tsc \
 release_version=$(python3 -m tools.version show)
 npm install --prefix examples/node/attachments/dist \
   --ignore-scripts --omit=optional --no-audit --no-fund \
-  "$PWD/dist/mikrio-$release_version.tgz" \
+  "$PWD/dist/mikrio-node-$release_version.tgz" \
   "$PWD/dist/mikrio-node-darwin-arm64-$release_version.tgz"
 node examples/node/attachments/dist/src/main.mjs local-init \
   /absolute/new/private-demo
@@ -195,7 +195,7 @@ against installed Node.js archives from the repository root:
 ```sh
 release_version=$(python3 -m tools.version show)
 python3 -m tools.test_bindings attachments \
-  "dist/mikrio-$release_version.tgz" \
+  "dist/mikrio-node-$release_version.tgz" \
   --native "dist/mikrio-node-darwin-arm64-$release_version.tgz"
 ```
 

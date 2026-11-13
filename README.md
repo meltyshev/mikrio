@@ -27,7 +27,7 @@ Package and archive names:
 | -------------------- | ---------------------------------------- |
 | Rust                 | `mikrio`                                 |
 | Python               | `mikrio`                                 |
-| Node.js / TypeScript | `mikrio`                                 |
+| Node.js / TypeScript | `@mikrio/node`                           |
 | CLI                  | `mikrio-cli-<version>-<platform>.tar.gz` |
 | C                    | `mikrio-c-<version>-<platform>.tar.gz`   |
 
@@ -40,7 +40,7 @@ deploying Rust applications.
 
 ```sh
 pip install mikrio
-npm install mikrio
+npm install @mikrio/node
 cargo add mikrio
 ```
 
@@ -61,7 +61,7 @@ with Store.open(directory="./storage") as store:
 ## Node.js
 
 ```typescript
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 
 const store = await Store.open({ directory: "./storage" });
 

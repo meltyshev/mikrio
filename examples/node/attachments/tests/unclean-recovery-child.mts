@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 import { Attachments } from "../src/attachments.mjs";
 import { loadConfig } from "../src/config.mjs";
 import { initializeLocal } from "../src/local.mjs";

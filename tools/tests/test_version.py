@@ -87,7 +87,7 @@ source = { registry = "https://pypi.org/simple" }
         (node / "package.json").write_text(
             json.dumps(
                 {
-                    "name": "mikrio",
+                    "name": "@mikrio/node",
                     "version": "0.1.0",
                     "optionalDependencies": {targets[0]["name"]: "0.1.0"},
                     "dependencies": {"foreign": "0.1.0"},

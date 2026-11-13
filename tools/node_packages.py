@@ -7,6 +7,12 @@ from typing import Any
 
 from tools.artifacts import ROOT
 
+PUBLIC_PACKAGE_NAME = "@mikrio/node"
+
+
+def archive_name(name: str, version: str) -> str:
+    return name.removeprefix("@").replace("/", "-") + f"-{version}.tgz"
+
 
 def targets() -> list[dict[str, str]]:
     """Share the NAPI-RS target names with the lazy runtime loader."""
@@ -38,8 +44,9 @@ def native_readme(matrix: str) -> str:
 
 Native Node.js binding for mikrio on `{matrix}`.
 
-Install [mikrio](https://www.npmjs.com/package/mikrio); it selects this package
-automatically for the matching operating system and architecture.
+Install [{PUBLIC_PACKAGE_NAME}](https://www.npmjs.com/package/{PUBLIC_PACKAGE_NAME});
+it selects this package automatically for the matching operating system and
+architecture.
 
 Keep `mikrio.node`, `{target["runtime"]}`, and `mikrio-sqlite-runtime.json`
 together. No install script or local compiler is required.

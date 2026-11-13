@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { Store, StorageError } from "mikrio";
+import { Store, StorageError } from "@mikrio/node";
 
 await test("multipart: resumable parts, copy, failure and owned results", async (context) => {
   const directory = await mkdtemp(join(tmpdir(), "mikrio-multipart-"));

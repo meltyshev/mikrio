@@ -6,7 +6,7 @@ import {
   GetObjectCommand,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
-import { Store, StorageError } from "mikrio";
+import { Store, StorageError } from "@mikrio/node";
 import { Attachments } from "../src/attachments.mjs";
 import { loadConfig } from "../src/config.mjs";
 import { State } from "../src/state.mjs";

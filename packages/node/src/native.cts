@@ -442,7 +442,7 @@ export function loadNative(): NativeAddon {
 
   const matchesPackage =
     isPackage(expected) &&
-    expected.name === "mikrio" &&
+    expected.name === "@mikrio/node" &&
     isPackage(installed) &&
     installed.name === name &&
     installed.version === expected.version;

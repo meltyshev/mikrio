@@ -251,7 +251,7 @@ jobs:
           python_interpreter=$(uv python find "$UV_PYTHON")
           "$python_interpreter" -m tools.test_bindings python dist/*.whl
           "$python_interpreter" -m tools.test_bindings node \
-            "dist/mikrio-$RELEASE_VERSION.tgz" --native dist/mikrio-node-*.tgz
+            "dist/mikrio-node-$RELEASE_VERSION.tgz" --native dist/mikrio-node-*-"$RELEASE_VERSION".tgz
 
       - name: Verify clean working tree
         run: |
@@ -454,7 +454,7 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 50
     environment: npm
     steps:
       - name: Check out source
@@ -608,9 +608,9 @@ jobs:
           cd "$RUNNER_TEMP/mikrio-registry-node"
           echo '{"private":true}' > package.json
           npm install --ignore-scripts --no-audit --no-fund \
-            --registry https://registry.npmjs.org/ "mikrio@$RELEASE_VERSION"
+            --registry https://registry.npmjs.org/ "@mikrio/node@$RELEASE_VERSION"
           node --input-type=module - <<'JS'
-          import { Store } from "mikrio";
+          import { Store } from "@mikrio/node";
 
           const store = await Store.open({ directory: "./store" });
 

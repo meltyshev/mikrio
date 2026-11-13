@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 import { Auth } from "../src/auth.mjs";
 import { loadConfig } from "../src/config.mjs";
 import { configureLocalPublication, initializeLocal } from "../src/local.mjs";

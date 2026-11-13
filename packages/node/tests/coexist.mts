@@ -13,7 +13,7 @@ try {
     database = new sqlite.DatabaseSync(":memory:");
   }
 
-  const { Store } = await import("mikrio");
+  const { Store } = await import("@mikrio/node");
 
   {
     await using store = await Store.open({ directory });

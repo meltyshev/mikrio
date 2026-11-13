@@ -1,4 +1,9 @@
-import { Store, StorageError, type OpenOptions, type StoreInfo } from "mikrio";
+import {
+  Store,
+  StorageError,
+  type OpenOptions,
+  type StoreInfo,
+} from "@mikrio/node";
 
 export async function positive(directory: string): Promise<StoreInfo> {
   const options: OpenOptions = { directory, region: undefined };

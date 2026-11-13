@@ -1,7 +1,8 @@
-"""Wheel auditing may change tags and records, but never package payloads."""
+"""Release builds select matching archives and preserve audited wheel payloads."""
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 import zipfile
@@ -14,6 +15,63 @@ from tools.artifacts import digest
 
 
 class ReleaseBuildTests(unittest.TestCase):
+    def test_native_build_selects_the_matching_scoped_archives(self) -> None:
+        for target, suffix in (
+            ("macos-arm64", "darwin-arm64"),
+            ("macos-x86_64", "darwin-x64"),
+            ("linux-arm64", "linux-arm64-gnu"),
+            ("linux-x86_64", "linux-x64-gnu"),
+            ("windows-x86_64", "win32-x64-msvc"),
+        ):
+            for change in ("none", "missing-public", "missing-native", "extra-native"):
+                with (
+                    self.subTest(target=target, change=change),
+                    tempfile.TemporaryDirectory() as temporary,
+                    patch.dict(os.environ),
+                ):
+                    directory = Path(temporary)
+                    public = directory / "mikrio-node-0.1.0.tgz"
+                    native = directory / f"mikrio-node-{suffix}-0.1.0.tgz"
+                    wheel = directory / "test.whl"
+
+                    for path in (public, native, wheel):
+                        path.write_bytes(b"artifact")
+
+                    if change == "missing-public":
+                        public.unlink()
+                    elif change == "missing-native":
+                        native.unlink()
+                    elif change == "extra-native":
+                        (directory / "mikrio-node-unexpected-0.1.0.tgz").touch()
+
+                    with (
+                        patch.object(build_release, "check", return_value="0.1.0"),
+                        patch.object(build_release, "invoke") as invoke,
+                        patch.object(
+                            build_release, "audit_linux_wheel", return_value=wheel
+                        ),
+                        patch.object(build_release, "test_cli"),
+                    ):
+                        if change != "none":
+                            with self.assertRaisesRegex(
+                                ValueError, "matching native npm"
+                            ):
+                                build_release.build_native(target, directory)
+
+                            continue
+
+                        build_release.build_native(target, directory)
+
+                    node_tests = [
+                        call.args
+                        for call in invoke.call_args_list
+                        if call.args[:2] == ("tools.test_bindings", "node")
+                    ]
+
+                    self.assertEqual(len(node_tests), 1)
+                    self.assertEqual(node_tests[0][2], str(public))
+                    self.assertEqual(node_tests[0][4], str(native))
+
     def test_wheel_audit_accepts_directory_entries_and_rejects_payload_changes(
         self,
     ) -> None:
@@ -70,6 +128,7 @@ class ReleaseBuildTests(unittest.TestCase):
             )
 
             destination = Path(command[command.index("--wheel-dir") + 1])
+
             repaired = (
                 destination
                 / f"mikrio-0.1.0-cp312-abi3-manylinux_2_28_{architecture}.whl"
@@ -126,6 +185,7 @@ class ReleaseBuildTests(unittest.TestCase):
                     self.assertEqual(archive.read(name), payload)
 
             self.assertEqual(archive.read(metadata_prefix + "WHEEL"), b"audited tags")
+
             self.assertEqual(
                 archive.read(metadata_prefix + "RECORD"), b"audited record"
             )

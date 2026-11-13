@@ -21,9 +21,9 @@ update these names:
   `mikrio-s3s`, `mikrio-s3s-multipart`, `mikrio-rusqlite`, and
   `mikrio-libsqlite3-sys`.
 - **PyPI:** `mikrio`.
-- **npm:** `mikrio`, `@mikrio/node-darwin-arm64`, `@mikrio/node-darwin-x64`,
-  `@mikrio/node-linux-arm64-gnu`, `@mikrio/node-linux-x64-gnu`, and
-  `@mikrio/node-win32-x64-msvc`.
+- **npm:** `@mikrio/node`, `@mikrio/node-darwin-arm64`,
+  `@mikrio/node-darwin-x64`, `@mikrio/node-linux-arm64-gnu`,
+  `@mikrio/node-linux-x64-gnu`, and `@mikrio/node-win32-x64-msvc`.
 - **GitHub Releases:** CLI and C archives, checksums, and release notes.
 
 Workspace packages, Python, the Node.js wrapper, and native npm packages use the
@@ -127,9 +127,8 @@ tokens. Select `bootstrap` only for this publication. Normal runs use trusted
 publishing and never fall back to stored tokens.
 
 Use accounts with verified email addresses and two-factor authentication. On
-npm, create or obtain publishing access to the `@mikrio` scope as well as the
-unscoped `mikrio` name. A GitHub repository does not grant ownership of registry
-names.
+npm, create or obtain publishing access to the `@mikrio` scope. A GitHub
+repository does not grant ownership of registry names.
 
 ### crates.io
 
@@ -145,11 +144,12 @@ crates, also enable **publish-update**. Add the token in GitHub under **Settings
 
 In npm's **Access Tokens**, generate a granular access token with **Read and
 write** package permissions and **Bypass two-factor authentication** enabled for
-non-interactive publishing. It must permit creating `mikrio` and the five
-`@mikrio` packages. Use **All Packages** when the unpublished unscoped name
-cannot be selected, and give the token a short expiration. Organization
-administration permissions are not needed. Add it to the GitHub `npm`
-environment as **`NPM_TOKEN`**. See [npm token setup][npm-tokens].
+non-interactive publishing. Allow direct publishing with **`npm publish`** and
+select the `@mikrio` scope under **Packages and scopes** so the token can create
+and update all six packages, including unpublished names. Give it a short
+expiration. Organization administration permissions are not needed. Add it to
+the GitHub `npm` environment as **`NPM_TOKEN`**. See [npm token
+setup][npm-tokens].
 
 ### PyPI
 
@@ -270,6 +270,13 @@ blanket `skip-existing`, and GitHub uploads do not use `--clobber`. Registry
 publication is not atomic: successful uploads remain public if another job
 fails. Diagnose the failure and resume with the same bytes before announcing the
 release.
+
+npm publication waits up to 20 minutes for each group of accepted uploads to
+become visible and match the reviewed checksums. Native packages must pass this
+check before the wrapper is uploaded. If registry processing exceeds the wait,
+check the package status before resuming. Registry errors include the response
+details and `Retry-After` header when present; resolve permission or package
+policy errors before retrying.
 
 [cargo-upload]:
   https://doc.rust-lang.org/cargo/reference/registry-web-api.html#publish

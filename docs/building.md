@@ -212,10 +212,10 @@ release_version=$(python3 -m tools.version show)
 uv run --project packages/python --no-sync python -m tools.test_bindings \
   python "dist/mikrio-$release_version-cp312-abi3-macosx_11_0_arm64.whl"
 python3 -m tools.test_bindings node \
-  "dist/mikrio-$release_version.tgz" \
+  "dist/mikrio-node-$release_version.tgz" \
   --native "dist/mikrio-node-darwin-arm64-$release_version.tgz"
 python3 -m tools.test_bindings attachments \
-  "dist/mikrio-$release_version.tgz" \
+  "dist/mikrio-node-$release_version.tgz" \
   --native "dist/mikrio-node-darwin-arm64-$release_version.tgz"
 python3 -m tools.test_ffi "dist/mikrio-c-$release_version-macos-arm64.tar.gz"
 python3 -m tools.test_rust dist

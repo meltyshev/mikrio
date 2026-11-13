@@ -20,9 +20,11 @@ from pathlib import Path
 from typing import Any
 
 from tools.artifacts import digest
+from tools.node_packages import PUBLIC_PACKAGE_NAME
 from tools.release import read_tar_members, rust_publish_order, verify, write_output
 
 USER_AGENT = "mikrio-release (https://github.com/meltyshev/mikrio)"
+NPM_VISIBILITY_TIMEOUT_SECONDS = 20 * 60
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -56,10 +58,30 @@ def registry_request(
         ) as response:
             return bytes(response.read())
     except urllib.error.HTTPError as error:
-        if error.code == 404 and body is None:
-            return None
+        with error:
+            if error.code == 404 and body is None:
+                return None
 
-        raise RuntimeError(f"registry returned HTTP {error.code}: {url}") from None
+            detail = error.read(4096).decode("utf-8", errors="replace")
+            detail = " ".join(detail.split())
+
+            detail = "".join(
+                character for character in detail if character.isprintable()
+            )
+
+            retry_after = error.headers.get("Retry-After")
+            message = f"registry returned HTTP {error.code}: {url}"
+
+            if retry_after:
+                message += f"; Retry-After: {retry_after[:256]!r}"
+
+            if detail:
+                message += f"; {detail}"
+
+            if token:
+                message = message.replace(token, "[redacted]")
+
+            raise RuntimeError(message) from None
 
 
 def find_published_crate(name: str, version: str) -> dict[str, Any] | None:
@@ -305,39 +327,78 @@ def is_npm_published(package: dict[str, str], directory: Path) -> bool:
     return True
 
 
+def wait_for_npm(packages: list[dict[str, str]], directory: Path) -> None:
+    """Allow registry scanning to finish without repeating accepted uploads."""
+
+    if not packages:
+        return
+
+    names = ", ".join(package["file"] for package in packages)
+    print(f"Waiting for npm registry processing: {names}", flush=True)
+    deadline = time.monotonic() + NPM_VISIBILITY_TIMEOUT_SECONDS
+    pending = packages
+
+    while pending:
+        pending = [
+            package for package in pending if not is_npm_published(package, directory)
+        ]
+
+        if not pending:
+            return
+
+        remaining = deadline - time.monotonic()
+
+        if remaining <= 0:
+            names = ", ".join(package["file"] for package in pending)
+
+            raise TimeoutError(
+                f"npm packages are not visible after registry processing: {names}; "
+                "check registry status before resuming with the same release archives"
+            )
+
+        time.sleep(min(10, remaining))
+
+
 def publish_npm(directory: Path, records: list[dict[str, str]]) -> None:
     packages = sorted(
         (package for package in records if package["kind"] == "npm"),
-        key=lambda package: (package["name"] == "mikrio", package["name"]),
+        key=lambda package: package["name"],
     )
 
-    for package in packages:
-        if is_npm_published(package, directory):
-            continue
+    native_packages = [
+        package for package in packages if package["name"] != PUBLIC_PACKAGE_NAME
+    ]
 
-        subprocess.run(
-            [
-                "npm",
-                "publish",
-                str((directory / package["file"]).resolve()),
-                "--access",
-                "public",
-                "--ignore-scripts",
-                "--registry",
-                "https://registry.npmjs.org/",
-                "--tag",
-                "latest",
-            ],
-            check=True,
-        )
+    public_packages = [
+        package for package in packages if package["name"] == PUBLIC_PACKAGE_NAME
+    ]
 
-        for _ in range(30):
+    for group in (native_packages, public_packages):
+        pending = []
+
+        for package in group:
             if is_npm_published(package, directory):
-                break
+                continue
 
-            time.sleep(10)
-        else:
-            raise TimeoutError(f"npm package is not visible: {package['file']}")
+            subprocess.run(
+                [
+                    "npm",
+                    "publish",
+                    str((directory / package["file"]).resolve()),
+                    "--access",
+                    "public",
+                    "--ignore-scripts",
+                    "--registry",
+                    "https://registry.npmjs.org/",
+                    "--tag",
+                    "latest",
+                ],
+                check=True,
+            )
+
+            pending.append(package)
+
+        wait_for_npm(pending, directory)
 
 
 def pypi_checksums(version: str) -> dict[str, str]:

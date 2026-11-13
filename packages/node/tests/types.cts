@@ -1,4 +1,4 @@
-import { Store, type OpenOptions } from "mikrio";
+import { Store, type OpenOptions } from "@mikrio/node";
 
 export async function commonjs(directory: string): Promise<string> {
   const options: OpenOptions = { directory, region: undefined };

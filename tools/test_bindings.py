@@ -15,7 +15,7 @@ from pathlib import Path
 from tools.artifacts import ROOT
 from tools.build import run as build_run
 from tools.native_runtime import retain_native, runtime_from_build
-from tools.node_packages import targets
+from tools.node_packages import PUBLIC_PACKAGE_NAME, targets
 
 
 def environment() -> dict[str, str]:
@@ -382,7 +382,7 @@ console.log(JSON.stringify(
         )
 
         # Install the exact local native archives beside the locked SDK closure.
-        package_names = {"mikrio"} | {target["name"] for target in targets()}
+        package_names = {PUBLIC_PACKAGE_NAME} | {target["name"] for target in targets()}
 
         for archive_path in (package, native):
             with tarfile.open(archive_path) as archive:

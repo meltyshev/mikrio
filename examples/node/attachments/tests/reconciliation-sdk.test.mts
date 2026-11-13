@@ -9,7 +9,7 @@ import {
   S3Client,
   S3ServiceException,
 } from "@aws-sdk/client-s3";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 import { Attachments } from "../src/attachments.mjs";
 import { loadConfig } from "../src/config.mjs";
 import {

@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { Store, StorageError, type CallOptions } from "mikrio";
+import { Store, StorageError, type CallOptions } from "@mikrio/node";
 
 const POLICY =
   '{"Version":"2012-10-17","Statement":{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::photos/*"}}';

@@ -20,7 +20,12 @@ from pathlib import Path, PurePosixPath
 from tools.artifacts import ROOT, digest
 from tools.build import rust_package_manifests
 from tools.native_runtime import RECEIPT, TARGETS
-from tools.node_packages import optional_dependencies, target_metadata
+from tools.node_packages import (
+    PUBLIC_PACKAGE_NAME,
+    archive_name,
+    optional_dependencies,
+    target_metadata,
+)
 from tools.package_cli import binary_names
 from tools.package_cli import verify as verify_cli
 from tools.package_ffi import library_names
@@ -370,12 +375,12 @@ def inspect_npm(path: Path, contents: dict[str, bytes], version: str) -> dict[st
         raise ValueError("unexpected npm version or lifecycle scripts")
 
     name = manifest["name"]
-    expected_filename = name.replace("@", "").replace("/", "-") + f"-{version}.tgz"
+    expected_filename = archive_name(name, version)
 
     if path.name != expected_filename:
         raise ValueError("npm filename differs from its package identity")
 
-    if name == "mikrio":
+    if name == PUBLIC_PACKAGE_NAME:
         if manifest["optionalDependencies"] != optional_dependencies(version):
             raise ValueError("npm native dependencies differ from the release")
 
@@ -492,7 +497,8 @@ def inspect_native_archive(
 
 def validate_inventory(records: list[dict[str, str]]) -> None:
     expected = {("crates", package["name"], "") for package in rust_publish_order()} | {
-        ("npm", name, "") for name in ("mikrio", *optional_dependencies(check()))
+        ("npm", name, "")
+        for name in (PUBLIC_PACKAGE_NAME, *optional_dependencies(check()))
     }
 
     expected |= {("pypi", "mikrio", target) for target in (*TARGETS, "source")}
@@ -526,7 +532,7 @@ def assemble(source: Path, destination: Path) -> None:
         destination_path = destination / path.name
 
         if destination_path.exists():
-            if path.name != f"mikrio-{version}.tgz":
+            if path.name != archive_name(PUBLIC_PACKAGE_NAME, version):
                 raise ValueError("conflicting artifacts from native builders")
 
             if digest(path) != digest(destination_path):

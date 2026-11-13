@@ -30,6 +30,114 @@ def write_archive(path: Path, members: list[tuple[str, bytes]]) -> None:
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_public_npm_archive_requires_the_scoped_identity_and_native_versions(
+        self,
+    ) -> None:
+        manifest = {
+            "name": "@mikrio/node",
+            "version": "0.1.0",
+            "optionalDependencies": optional_dependencies("0.1.0"),
+        }
+
+        contents = {
+            "package/" + name: b"package content"
+            for name in (
+                "LICENSE",
+                "README.md",
+                "THIRD_PARTY_LICENSES.txt",
+                "dist/index.cjs",
+                "dist/index.mjs",
+                "dist/index.d.cts",
+                "dist/index.d.mts",
+                "dist/targets.json",
+            )
+        }
+
+        contents["package/package.json"] = json.dumps(manifest).encode()
+        path = Path("mikrio-node-0.1.0.tgz")
+
+        self.assertEqual(
+            release.inspect_npm(path, contents, "0.1.0"),
+            {"kind": "npm", "name": "@mikrio/node"},
+        )
+
+        for change in ("name", "filename", "dependency", "declarations"):
+            with self.subTest(change=change):
+                changed = dict(contents)
+                filename = path
+
+                if change == "name":
+                    changed["package/package.json"] = json.dumps(
+                        manifest | {"name": "@mikrio/other"}
+                    ).encode()
+                elif change == "filename":
+                    filename = Path("mikrio-0.1.0.tgz")
+                elif change == "dependency":
+                    changed["package/package.json"] = json.dumps(
+                        manifest
+                        | {"optionalDependencies": optional_dependencies("0.1.1")}
+                    ).encode()
+                else:
+                    del changed["package/dist/index.d.cts"]
+
+                with self.assertRaises(ValueError):
+                    release.inspect_npm(filename, changed, "0.1.0")
+
+    def test_assembly_deduplicates_only_identical_public_npm_archives(self) -> None:
+        for change in ("none", "different-bytes", "native"):
+            with (
+                self.subTest(change=change),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary)
+                source = root / "incoming"
+                destination = root / "release"
+
+                filename = (
+                    "mikrio-node-darwin-arm64-0.1.0.tgz"
+                    if change == "native"
+                    else "mikrio-node-0.1.0.tgz"
+                )
+
+                for target in ("first", "second"):
+                    (source / target).mkdir(parents=True)
+                    payload = b"wrapper"
+
+                    if change == "different-bytes" and target == "second":
+                        payload = b"different wrapper"
+
+                    (source / target / filename).write_bytes(payload)
+
+                with (
+                    patch.object(release, "check", return_value="0.1.0"),
+                    patch.object(release, "source_revision", return_value="reviewed"),
+                    patch.object(
+                        release, "inspect_package", return_value={"file": filename}
+                    ) as inspect,
+                    patch.object(release, "validate_inventory"),
+                    patch.object(release, "rust_publish_order", return_value=[]),
+                    patch.object(
+                        release, "release_notes", return_value="Reviewed notes"
+                    ),
+                    patch.object(release, "verify"),
+                ):
+                    if change != "none":
+                        with self.assertRaisesRegex(
+                            ValueError, "conflicting artifacts"
+                        ):
+                            release.assemble(source, destination)
+
+                        inspect.assert_not_called()
+                        continue
+
+                    release.assemble(source, destination)
+
+                    inspect.assert_called_once_with(
+                        destination / filename, "0.1.0", "reviewed"
+                    )
+
+                self.assertEqual((destination / filename).read_bytes(), b"wrapper")
+
     def test_repacked_linux_wheels_accept_directory_entries_during_assembly(
         self,
     ) -> None:
@@ -45,6 +153,7 @@ class ReleaseTests(unittest.TestCase):
                     Path(temporary)
                     / f"mikrio-0.1.0-cp312-abi3-manylinux_2_28_{architecture}.whl"
                 )
+
                 payload = bytearray(64)
                 payload[:6] = b"\x7fELF\x02\x01"
                 struct.pack_into("<H", payload, 18, machine)
@@ -223,7 +332,7 @@ class ReleaseTests(unittest.TestCase):
 
         records += [
             {"kind": "npm", "name": name}
-            for name in ("mikrio", *optional_dependencies(check()))
+            for name in ("@mikrio/node", *optional_dependencies(check()))
         ]
 
         records += [

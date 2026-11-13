@@ -7,10 +7,13 @@ import hashlib
 import io
 import json
 import struct
+import subprocess
 import tarfile
 import tempfile
 import unittest
+import urllib.error
 import urllib.parse
+from email.message import Message
 from pathlib import Path
 from unittest.mock import patch
 
@@ -27,6 +30,202 @@ def write_archive(path: Path, members: list[tuple[str, bytes]]) -> None:
 
 
 class PublishTests(unittest.TestCase):
+    def test_registry_errors_preserve_bounded_details_without_retrying_uploads(
+        self,
+    ) -> None:
+        url = "https://crates.io/api/v1/crates/new"
+
+        for code, body in (
+            (429, b"upload"),
+            (403, b"upload"),
+            (404, b"upload"),
+            (404, None),
+        ):
+            with self.subTest(code=code, body=body):
+                headers = Message()
+                headers["Retry-After"] = "600"
+                response = io.BytesIO(b"try later secret-token\n\x1b" + b"x" * 5000)
+                error = urllib.error.HTTPError(url, code, "failure", headers, response)
+
+                with patch("tools.publish.urllib.request.build_opener") as opener:
+                    opener.return_value.open.side_effect = error
+
+                    if code == 404 and body is None:
+                        self.assertIsNone(publish.registry_request(url))
+                    else:
+                        with self.assertRaises(RuntimeError) as caught:
+                            publish.registry_request(
+                                url, body=body, token="secret-token"
+                            )
+
+                        message = str(caught.exception)
+                        self.assertIn(f"HTTP {code}", message)
+                        self.assertIn("Retry-After: '600'", message)
+                        self.assertIn("try later [redacted]", message)
+                        self.assertNotIn("secret-token", message)
+                        self.assertNotIn("\n", message)
+                        self.assertNotIn("\x1b", message)
+                        self.assertLess(len(message), 4300)
+
+                    opener.return_value.open.assert_called_once()
+
+    def test_npm_processing_waits_for_all_natives_before_uploading_the_wrapper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+
+            records = [
+                {"kind": "npm", "name": name, "version": "0.1.0", "file": filename}
+                for name, filename in (
+                    ("@mikrio/node", "mikrio-node-0.1.0.tgz"),
+                    ("@mikrio/node-darwin-arm64", "mikrio-node-darwin-arm64-0.1.0.tgz"),
+                    (
+                        "@mikrio/node-linux-arm64-gnu",
+                        "mikrio-node-linux-arm64-gnu-0.1.0.tgz",
+                    ),
+                )
+            ]
+
+            now = 0.0
+            accepted: dict[str, float] = {}
+
+            processing_seconds = {
+                "@mikrio/node": 600,
+                "@mikrio/node-darwin-arm64": 300,
+                "@mikrio/node-linux-arm64-gnu": 900,
+            }
+
+            for package in records:
+                (directory / package["file"]).write_bytes(package["name"].encode())
+
+            def registry_response(url: str) -> bytes | None:
+                name = urllib.parse.unquote(url.split("/")[-2])
+
+                if name not in accepted:
+                    return None
+
+                if now - accepted[name] < processing_seconds[name]:
+                    return None
+
+                checksum = base64.b64encode(
+                    hashlib.sha512(name.encode()).digest()
+                ).decode()
+
+                return json.dumps(
+                    {"dist": {"integrity": "sha512-" + checksum}}
+                ).encode()
+
+            def upload(command: list[str], *, check: bool) -> None:
+                name = Path(command[2]).read_text(encoding="utf-8")
+                self.assertNotIn(name, accepted)
+
+                if name == "@mikrio/node":
+                    self.assertEqual(len(accepted), 2)
+                    self.assertGreaterEqual(now, 900)
+
+                accepted[name] = now
+
+            def sleep(seconds: float) -> None:
+                nonlocal now
+                now += seconds
+
+            with (
+                patch.object(
+                    publish, "registry_request", side_effect=registry_response
+                ),
+                patch("tools.publish.subprocess.run", side_effect=upload) as command,
+                patch("tools.publish.time.monotonic", side_effect=lambda: now),
+                patch("tools.publish.time.sleep", side_effect=sleep),
+            ):
+                publish.publish_npm(directory, records)
+                publish.publish_npm(directory, records)
+                self.assertEqual(command.call_count, 3)
+
+            self.assertEqual(now, 1500)
+            self.assertEqual(list(accepted)[-1], "@mikrio/node")
+
+    def test_npm_processing_rejects_different_bytes_before_uploading_the_wrapper(
+        self,
+    ) -> None:
+        records = [
+            {
+                "kind": "npm",
+                "name": "@mikrio/node",
+                "version": "0.1.0",
+                "file": "mikrio-node-0.1.0.tgz",
+            },
+            {
+                "kind": "npm",
+                "name": "@mikrio/node-darwin-arm64",
+                "version": "0.1.0",
+                "file": "mikrio-node-darwin-arm64-0.1.0.tgz",
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            native = directory / "mikrio-node-darwin-arm64-0.1.0.tgz"
+            native.write_bytes(b"reviewed native archive")
+
+            with (
+                patch.object(
+                    publish,
+                    "registry_request",
+                    side_effect=(None, b'{"dist":{"integrity":"wrong"}}'),
+                ),
+                patch("tools.publish.subprocess.run") as command,
+                patch("tools.publish.time.sleep") as sleep,
+                self.assertRaisesRegex(ValueError, "different bytes"),
+            ):
+                publish.publish_npm(directory, records)
+
+            command.assert_called_once()
+            self.assertEqual(Path(command.call_args.args[0][2]), native.resolve())
+            sleep.assert_not_called()
+
+    def test_npm_processing_timeout_preserves_pending_uploads_and_blocks_the_wrapper(
+        self,
+    ) -> None:
+        records = [
+            {"kind": "npm", "name": "@mikrio/node", "file": "mikrio-node-0.1.0.tgz"},
+            {"kind": "npm", "name": "@mikrio/node-darwin-arm64", "file": "native.tgz"},
+        ]
+
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            patch.object(publish, "is_npm_published", return_value=False),
+            patch("tools.publish.subprocess.run") as command,
+            patch("tools.publish.time.monotonic", side_effect=(0, 1195, 1200)),
+            patch("tools.publish.time.sleep") as sleep,
+            self.assertRaisesRegex(TimeoutError, "native.tgz.*same release archives"),
+        ):
+            publish.publish_npm(Path(temporary), records)
+
+        command.assert_called_once()
+        self.assertEqual(Path(command.call_args.args[0][2]).name, "native.tgz")
+        sleep.assert_called_once_with(5)
+
+    def test_npm_rejection_is_not_retried_or_treated_as_pending(self) -> None:
+        records = [
+            {"kind": "npm", "name": "@mikrio/node", "file": "mikrio-node-0.1.0.tgz"}
+        ]
+
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            patch.object(publish, "is_npm_published", return_value=False),
+            patch(
+                "tools.publish.subprocess.run",
+                side_effect=subprocess.CalledProcessError(1, "npm publish"),
+            ) as command,
+            patch("tools.publish.time.sleep") as sleep,
+            self.assertRaises(subprocess.CalledProcessError),
+        ):
+            publish.publish_npm(Path(temporary), records)
+
+        command.assert_called_once()
+        sleep.assert_not_called()
+
     def test_npm_resume_publishes_missing_native_packages_before_the_wrapper(
         self,
     ) -> None:
@@ -35,7 +234,7 @@ class PublishTests(unittest.TestCase):
             records = []
 
             for name in (
-                "mikrio",
+                "@mikrio/node",
                 "@mikrio/node-linux-arm64-gnu",
                 "@mikrio/node-darwin-arm64",
             ):
@@ -80,7 +279,7 @@ class PublishTests(unittest.TestCase):
                 publish.publish_npm(directory, records)
                 publish.publish_npm(directory, records)
 
-            self.assertEqual(uploaded, ["@mikrio/node-linux-arm64-gnu", "mikrio"])
+            self.assertEqual(uploaded, ["@mikrio/node-linux-arm64-gnu", "@mikrio/node"])
 
             with (
                 patch.object(

@@ -7,7 +7,7 @@ import { Readable } from "node:stream";
 import { test, type TestContext } from "node:test";
 import { fileURLToPath } from "node:url";
 import { Worker } from "node:worker_threads";
-import { Store, StorageError, type PutObjectOutput } from "mikrio";
+import { Store, StorageError, type PutObjectOutput } from "@mikrio/node";
 
 async function fixture(
   context: TestContext,

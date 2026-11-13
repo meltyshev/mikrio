@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { join, dirname } from "node:path";
 import { test } from "node:test";
-import { Store } from "mikrio";
+import { Store } from "@mikrio/node";
 import {
   S3Client,
   PutObjectTaggingCommand,

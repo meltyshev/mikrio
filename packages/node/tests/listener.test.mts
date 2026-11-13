@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { inspect, promisify } from "node:util";
 import { beforeEach, test, type TestContext } from "node:test";
 import { Worker } from "node:worker_threads";
-import { Store, StorageError } from "mikrio";
+import { Store, StorageError } from "@mikrio/node";
 
 const exec = promisify(execFile);
 
@@ -121,7 +121,7 @@ await test("listener: active listener retains the environment and parent close r
 
   try {
     const script = `
-      import { Store } from "mikrio";
+      import { Store } from "@mikrio/node";
 
       const store = await Store.open({ directory: process.argv[1] });
       const server = await store.listen();

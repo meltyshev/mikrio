@@ -16,6 +16,7 @@ from pathlib import Path
 from tools.artifacts import ROOT, digest
 from tools.build import run
 from tools.native_runtime import TARGETS
+from tools.node_packages import PUBLIC_PACKAGE_NAME, archive_name, target_metadata
 from tools.package_cli import binary_names, unpack
 from tools.release import read_tar_members
 from tools.test_bindings import environment
@@ -123,17 +124,21 @@ def build_native(target: str, destination: Path) -> None:
     )
 
     invoke("tools.test_bindings", "python", str(wheel))
-    native_packages = list(destination.glob("mikrio-node-*.tgz"))
+    public_package = destination / archive_name(PUBLIC_PACKAGE_NAME, version)
 
-    if len(native_packages) != 1:
-        raise ValueError("expected exactly one native npm archive")
+    native_package = destination / archive_name(
+        target_metadata(target)["name"], version
+    )
+
+    if set(destination.glob("*.tgz")) != {public_package, native_package}:
+        raise ValueError("expected the public and matching native npm archives")
 
     invoke(
         "tools.test_bindings",
         "node",
-        str(destination / f"mikrio-{version}.tgz"),
+        str(public_package),
         "--native",
-        str(native_packages[0]),
+        str(native_package),
         "--npm",
         npm,
     )

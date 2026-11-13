@@ -10,11 +10,11 @@ repository.workspace = true
 
 [dependencies]
 bytes.workspace = true
-mikrio = { version = "=0.1.0", path = "../mikrio", default-features = false }
+mikrio = { version = "=0.1.1", path = "../mikrio", default-features = false }
 tokio.workspace = true
 
 [build-dependencies]
-mikrio-build = { version = "=0.1.0", path = "../mikrio-build" }
+mikrio-build = { version = "=0.1.1", path = "../mikrio-build" }
 
 [lints]
 workspace = true

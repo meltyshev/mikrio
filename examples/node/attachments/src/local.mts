@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { Store, StorageError } from "mikrio";
+import { Store, StorageError } from "@mikrio/node";
 import { State } from "./state.mjs";
 import { AppError } from "./model.mjs";
 import type { Config } from "./config.mjs";
