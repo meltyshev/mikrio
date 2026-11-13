@@ -3,18 +3,10 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      mode:
-        description: Release mode
-        type: choice
-        options: [rehearsal, publish]
-        default: rehearsal
-        required: true
       bootstrap:
-        description: Use temporary crates.io and npm tokens for the first publication
+        description: Use crates.io and npm secrets to create new registry packages
         type: boolean
         default: false
-
-run-name: Release (${{ inputs.mode }})
 
 permissions: {}
 
@@ -26,14 +18,6 @@ defaults:
   run:
     shell: bash
 
-env:
-  CARGO_INCREMENTAL: "0"
-  CARGO_PROFILE_DEV_DEBUG: "0"
-  # The shared npm wrapper must have identical bytes on every builder.
-  GIT_CONFIG_COUNT: "1"
-  GIT_CONFIG_KEY_0: core.autocrlf
-  GIT_CONFIG_VALUE_0: "false"
-
 jobs:
   prepare:
     name: Prepare release
@@ -43,7 +27,6 @@ jobs:
     timeout-minutes: 10
     outputs:
       version: ${{ steps.identity.outputs.version }}
-      publish: ${{ steps.identity.outputs.publish }}
       bootstrap: ${{ steps.identity.outputs.bootstrap }}
     steps:
       - name: Check out source
@@ -55,7 +38,6 @@ jobs:
       - name: Verify release version and source
         id: identity
         env:
-          RELEASE_MODE: ${{ inputs.mode }}
           RELEASE_BOOTSTRAP: ${{ inputs.bootstrap }}
         run: python3 -m tools.release check
 
@@ -65,293 +47,12 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/checks.yaml
-
-  native:
-    name: Build native distributions (${{ matrix.target }})
-    needs: [prepare, checks]
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: macos-arm64
-            runner: macos-15
-            image: ""
-          - target: macos-x86_64
-            runner: macos-15-intel
-            image: ""
-          - target: windows-x86_64
-            runner: windows-2025
-            image: ""
-          - target: linux-arm64
-            runner: ubuntu-24.04-arm
-            # manylinux 2026.11.07-1
-            image: quay.io/pypa/manylinux_2_28_aarch64@sha256:cb37f0d66c8a75abb93cf6085cad1f1427cd7208f0c0fc48359bb1eea9924f21
-          - target: linux-x86_64
-            runner: ubuntu-24.04
-            image: quay.io/pypa/manylinux_2_28_x86_64@sha256:9555ba6c479fa69a2aa80ad1dc57154a60d562b19df159361d9379a02beb1e36
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 26.13.0
-          package-manager-cache: false
-
-      - name: Set up Python and uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: 0.13.7
-          python-version: 3.14.10
-          enable-cache: false
-
-      - name: Set up MSVC
-        if: runner.os == 'Windows'
-        uses: ./.github/actions/setup-msvc
-
-      - name: Set up Rust
-        run: rustup show
-
-      - name: Set up pnpm
-        run: |
-          npm install --global --ignore-scripts pnpm@12.18.0
-          # Activate the native binary with pnpm's reviewed setup hook.
-          node "$(npm root --global)/pnpm/install.js"
-
-      - name: Build and test native distributions
-        if: runner.os != 'Linux'
-        env:
-          RELEASE_TARGET: ${{ matrix.target }}
-        run: |
-          pnpm install --frozen-lockfile
-          uv sync --project packages/python --locked --group build --no-install-project --no-build
-          uv run --project packages/python --no-sync python -m tools.build_release native \
-            --target "$RELEASE_TARGET"
-
-      - name: Build and test native distributions with manylinux
-        if: runner.os == 'Linux'
-        env:
-          RELEASE_TARGET: ${{ matrix.target }}
-          MANYLINUX_IMAGE: ${{ matrix.image }}
-        run: |
-          docker run --rm \
-            --mount "type=bind,source=$PWD,target=/io" \
-            --mount "type=bind,source=$(rustup show home),target=/opt/rustup,readonly" \
-            --mount "type=bind,source=$(dirname "$(command -v cargo)"),target=/opt/rust/bin,readonly" \
-            --mount "type=bind,source=$(dirname "$(dirname "$(command -v node)")"),target=/opt/node,readonly" \
-            --mount "type=bind,source=$(command -v uv),target=/usr/local/bin/uv,readonly" \
-            --workdir /io \
-            --env RELEASE_TARGET \
-            --env RUSTUP_HOME=/opt/rustup \
-            --env CARGO_HOME=/tmp/cargo \
-            --env CARGO_INCREMENTAL=0 \
-            --env UV_PYTHON=3.14.10 \
-            --env UV_CACHE_DIR=/tmp/uv \
-            --env UV_PYTHON_INSTALL_DIR=/tmp/python \
-            --env GIT_CONFIG_COUNT=1 \
-            --env GIT_CONFIG_KEY_0=safe.directory \
-            --env GIT_CONFIG_VALUE_0=/io \
-            --env PATH=/opt/node/bin:/opt/rust/bin:/opt/rh/gcc-toolset-14/root/usr/bin:/opt/python/cp314-cp314/bin:/usr/local/bin:/usr/bin:/bin \
-            "$MANYLINUX_IMAGE" bash -euo pipefail -c '
-              pnpm install --frozen-lockfile
-              uv sync --project packages/python --locked --group build --no-install-project --no-build
-              uv run --project packages/python --no-sync python -m tools.build_release native \
-                --target "$RELEASE_TARGET"
-            '
-
-      - name: Verify clean working tree
-        run: |
-          working_tree_status=$(git status --porcelain)
-          test -z "$working_tree_status"
-
-      - name: Upload native distributions
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: native-${{ matrix.target }}
-          path: dist/*
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 90
-
-  runtimes:
-    name: Test runtimes (${{ matrix.platform.target }}, Node.js ${{ matrix.runtime.node }}, Python ${{ matrix.runtime.python }})
-    needs: [prepare, native]
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - target: macos-arm64
-            runner: macos-15
-          - target: linux-arm64
-            runner: ubuntu-24.04-arm
-        runtime:
-          - node: 22.23.4
-            python: 3.13.18
-          - node: 24.22.2
-            python: 3.15.2
-    runs-on: ${{ matrix.platform.runner }}
-    timeout-minutes: 45
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js for tooling
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 26.13.0
-          package-manager-cache: false
-
-      - name: Set up pnpm
-        run: |
-          npm install --global --ignore-scripts pnpm@12.18.0
-          # Activate the native binary with pnpm's reviewed setup hook.
-          node "$(npm root --global)/pnpm/install.js"
-
-      - name: Install Node.js dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set up Node.js for testing
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ matrix.runtime.node }}
-          package-manager-cache: false
-
-      - name: Set up Python and uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: 0.13.7
-          python-version: ${{ matrix.runtime.python }}
-          enable-cache: false
-
-      - name: Install Python
-        run: uv python install "$UV_PYTHON"
-
-      - name: Download native distributions
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: native-${{ matrix.platform.target }}
-          path: dist
-          digest-mismatch: error
-
-      - name: Test installed distributions
-        env:
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          python_interpreter=$(uv python find "$UV_PYTHON")
-          "$python_interpreter" -m tools.test_bindings python dist/*.whl
-          "$python_interpreter" -m tools.test_bindings node \
-            "dist/mikrio-node-$RELEASE_VERSION.tgz" --native dist/mikrio-node-*-"$RELEASE_VERSION".tgz
-
-      - name: Verify clean working tree
-        run: |
-          working_tree_status=$(git status --porcelain)
-          test -z "$working_tree_status"
-
-  sources:
-    name: Build source distributions
-    needs: [prepare, checks]
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 180
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Python and uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: 0.13.7
-          python-version: 3.14.10
-          enable-cache: false
-
-      - name: Set up Rust
-        run: rustup show
-
-      - name: Install Python dependencies
-        run: uv sync --project packages/python --locked --group build --no-install-project --no-build
-
-      - name: Build and test source distributions
-        run: uv run --project packages/python --no-sync python -m tools.build_release sources
-
-      - name: Verify clean working tree
-        run: |
-          working_tree_status=$(git status --porcelain)
-          test -z "$working_tree_status"
-
-      - name: Upload source distributions
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: sources
-          path: dist/*
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 90
-
-  assemble:
-    name: Assemble release
-    needs: [prepare, checks, native, runtimes, sources]
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    outputs:
-      artifact-id: ${{ steps.upload.outputs.artifact-id }}
-    steps:
-      - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Download native and source distributions
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          path: incoming
-          digest-mismatch: error
-
-      - name: Assemble and verify release
-        run: python3 -m tools.release assemble release --input incoming
-
-      - name: Upload release distributions
-        id: upload
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: release-${{ needs.prepare.outputs.version }}
-          path: release/*
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 90
-
-      - name: Write release summary
-        env:
-          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          {
-            echo "Release $RELEASE_VERSION passed package assembly and consumer checks."
-            echo
-            echo "[Download the tested archives, release manifest and checksums]($ARTIFACT_URL)."
-            echo
-            echo "Rehearsals stop here. Publishing runs create the version tag and require registry environment approvals."
-          } >> "$GITHUB_STEP_SUMMARY"
+    with:
+      release: true
 
   attest:
     name: Attest release
-    needs: [prepare, assemble]
-    if: needs.prepare.outputs.publish == 'true'
+    needs: checks
     permissions:
       contents: read
       id-token: write
@@ -362,7 +63,7 @@ jobs:
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          artifact-ids: ${{ needs.checks.outputs.artifact-id }}
           path: release
           merge-multiple: true
           digest-mismatch: error
@@ -374,8 +75,7 @@ jobs:
 
   tag:
     name: Create release tag
-    needs: [prepare, assemble, attest]
-    if: needs.prepare.outputs.publish == 'true'
+    needs: [checks, attest]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -389,7 +89,7 @@ jobs:
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          artifact-ids: ${{ needs.checks.outputs.artifact-id }}
           path: release
           merge-multiple: true
           digest-mismatch: error
@@ -401,8 +101,7 @@ jobs:
 
   crates:
     name: Publish to crates.io
-    needs: [prepare, assemble, tag]
-    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, checks, tag]
     permissions:
       contents: read
       id-token: write
@@ -418,7 +117,7 @@ jobs:
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          artifact-ids: ${{ needs.checks.outputs.artifact-id }}
           path: release
           merge-multiple: true
           digest-mismatch: error
@@ -448,8 +147,7 @@ jobs:
 
   npm:
     name: Publish to npm
-    needs: [prepare, assemble, tag]
-    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, checks, tag]
     permissions:
       contents: read
       id-token: write
@@ -472,7 +170,7 @@ jobs:
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          artifact-ids: ${{ needs.checks.outputs.artifact-id }}
           path: release
           merge-multiple: true
           digest-mismatch: error
@@ -495,8 +193,7 @@ jobs:
 
   pypi:
     name: Publish to PyPI
-    needs: [prepare, assemble, tag]
-    if: needs.prepare.outputs.publish == 'true'
+    needs: [checks, tag]
     permissions:
       contents: read
       id-token: write
@@ -512,7 +209,7 @@ jobs:
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          artifact-ids: ${{ needs.checks.outputs.artifact-id }}
           path: release
           merge-multiple: true
           digest-mismatch: error
@@ -531,7 +228,7 @@ jobs:
 
   registry-checks:
     name: Verify published packages (${{ matrix.runner }})
-    needs: [prepare, assemble, crates, npm, pypi]
+    needs: [prepare, checks, crates, npm, pypi]
     permissions:
       contents: read
     strategy:
@@ -553,16 +250,12 @@ jobs:
           package-manager-cache: false
 
       - name: Set up Python and uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: 0.13.7
-          python-version: 3.14.10
-          enable-cache: false
+        uses: ./.github/actions/setup-python
 
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          artifact-ids: ${{ needs.checks.outputs.artifact-id }}
           path: release
           merge-multiple: true
           digest-mismatch: error
@@ -580,7 +273,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          uv venv --python 3.14.10 "$RUNNER_TEMP/mikrio-registry-python"
+          uv venv --python "$UV_PYTHON" "$RUNNER_TEMP/mikrio-registry-python"
           registry_python="$RUNNER_TEMP/mikrio-registry-python/bin/python"
           uv pip install --python "$registry_python" --no-deps --only-binary :all: \
             --index-url https://pypi.org/simple "mikrio==$RELEASE_VERSION"
@@ -629,7 +322,7 @@ jobs:
 
   github:
     name: Publish to GitHub Releases
-    needs: [prepare, assemble, registry-checks]
+    needs: [checks, registry-checks]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -643,7 +336,7 @@ jobs:
       - name: Download release distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ needs.assemble.outputs.artifact-id }}
+          artifact-ids: ${{ needs.checks.outputs.artifact-id }}
           path: release
           merge-multiple: true
           digest-mismatch: error

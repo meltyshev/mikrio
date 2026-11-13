@@ -4,9 +4,6 @@
 
 - Node.js and TypeScript applications use `@mikrio/node` with matching native
   packages for each supported platform.
-- npm publication verifies native package availability before publishing the
-  wrapper and allows time for registry processing.
-- Registry failures include response details and retry timing when available.
 
 ## 0.1.0
 

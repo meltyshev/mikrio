@@ -88,7 +88,9 @@ preserve their licenses, patch descriptions, and generated-source checks.
 
 ## Releases
 
-Maintainers choose the release version and review release notes. Run the release
-workflow from `main` in `rehearsal` mode to build and test, or `publish` mode to
-create the version tag and publish after registry environment approval. See the
-[release guide](docs/releasing.md).
+Maintainers choose the release version and review release notes. Run the Release
+workflow from `main` to validate the complete distribution set, create the
+version tag, and publish the tested archives after registry environment
+approval. Use its `bootstrap` checkbox when new registry packages require secret
+tokens. Checks can also validate the complete release bundle without publishing.
+See the [release guide](docs/releasing.md).

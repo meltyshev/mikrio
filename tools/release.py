@@ -94,16 +94,10 @@ def preflight() -> None:
     ):
         raise ValueError("run the release workflow from main")
 
-    mode = os.environ.get("RELEASE_MODE", "rehearsal")
     bootstrap = os.environ.get("RELEASE_BOOTSTRAP", "false")
 
-    if mode not in {"rehearsal", "publish"} or bootstrap not in {"true", "false"}:
-        raise ValueError("invalid release mode or bootstrap option")
-
-    should_publish = mode == "publish"
-
-    if bootstrap == "true" and not should_publish:
-        raise ValueError("bootstrap authentication requires publish mode")
+    if bootstrap not in {"true", "false"}:
+        raise ValueError("invalid bootstrap option")
 
     if source_revision() != os.environ.get("GITHUB_SHA"):
         raise ValueError("checkout differs from the workflow source")
@@ -114,23 +108,21 @@ def preflight() -> None:
         check=True,
     )
 
-    if should_publish:
-        result = subprocess.run(
-            ["git", "show-ref", "--verify", "--quiet", f"refs/tags/v{version}"],
-            cwd=ROOT,
-            check=False,
+    result = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", f"refs/tags/v{version}"],
+        cwd=ROOT,
+        check=False,
+    )
+
+    if result.returncode == 0:
+        raise ValueError(
+            "release tag already exists; resume the original run's failed jobs"
         )
 
-        if result.returncode == 0:
-            raise ValueError(
-                "release tag already exists; resume the original run's failed jobs"
-            )
-
-        if result.returncode != 1:
-            result.check_returncode()
+    if result.returncode != 1:
+        result.check_returncode()
 
     write_output("version", version)
-    write_output("publish", str(should_publish).lower())
     write_output("bootstrap", bootstrap)
 
 

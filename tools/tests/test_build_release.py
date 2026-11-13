@@ -15,6 +15,65 @@ from tools.artifacts import digest
 
 
 class ReleaseBuildTests(unittest.TestCase):
+    def test_optional_consumers_receive_matching_archives_and_selected_tools(
+        self,
+    ) -> None:
+        for go, attachments in product((None, "go"), (False, True)):
+            with (
+                self.subTest(go=go, attachments=attachments),
+                tempfile.TemporaryDirectory() as temporary,
+                patch.dict(os.environ),
+            ):
+                directory = Path(temporary)
+                public_package = directory / "mikrio-node-0.1.0.tgz"
+                native_package = directory / "mikrio-node-darwin-arm64-0.1.0.tgz"
+
+                for path in (public_package, native_package, directory / "test.whl"):
+                    path.write_bytes(b"reviewed archive")
+
+                with (
+                    patch.object(build_release, "check", return_value="0.1.0"),
+                    patch.object(build_release, "invoke") as invoke,
+                    patch.object(build_release, "test_cli"),
+                ):
+                    build_release.build_native(
+                        "macos-arm64", directory, go=go, attachments=attachments
+                    )
+
+                commands = [call.args for call in invoke.call_args_list]
+
+                self.assertEqual(
+                    [command for command in commands if command[0] == "tools.test_ffi"],
+                    [
+                        (
+                            "tools.test_ffi",
+                            str(directory / "mikrio-c-0.1.0-macos-arm64.tar.gz"),
+                            *(["--go", go] if go else []),
+                        )
+                    ],
+                )
+
+                attachment_tests = [
+                    command
+                    for command in commands
+                    if command[:2] == ("tools.test_bindings", "attachments")
+                ]
+
+                self.assertEqual(
+                    attachment_tests,
+                    [
+                        (
+                            "tools.test_bindings",
+                            "attachments",
+                            str(public_package),
+                            "--native",
+                            str(native_package),
+                        )
+                    ]
+                    if attachments
+                    else [],
+                )
+
     def test_native_build_selects_the_matching_scoped_archives(self) -> None:
         for target, suffix in (
             ("macos-arm64", "darwin-arm64"),
@@ -30,17 +89,17 @@ class ReleaseBuildTests(unittest.TestCase):
                     patch.dict(os.environ),
                 ):
                     directory = Path(temporary)
-                    public = directory / "mikrio-node-0.1.0.tgz"
-                    native = directory / f"mikrio-node-{suffix}-0.1.0.tgz"
+                    public_package = directory / "mikrio-node-0.1.0.tgz"
+                    native_package = directory / f"mikrio-node-{suffix}-0.1.0.tgz"
                     wheel = directory / "test.whl"
 
-                    for path in (public, native, wheel):
+                    for path in (public_package, native_package, wheel):
                         path.write_bytes(b"artifact")
 
                     if change == "missing-public":
-                        public.unlink()
+                        public_package.unlink()
                     elif change == "missing-native":
-                        native.unlink()
+                        native_package.unlink()
                     elif change == "extra-native":
                         (directory / "mikrio-node-unexpected-0.1.0.tgz").touch()
 
@@ -69,8 +128,8 @@ class ReleaseBuildTests(unittest.TestCase):
                     ]
 
                     self.assertEqual(len(node_tests), 1)
-                    self.assertEqual(node_tests[0][2], str(public))
-                    self.assertEqual(node_tests[0][4], str(native))
+                    self.assertEqual(node_tests[0][2], str(public_package))
+                    self.assertEqual(node_tests[0][4], str(native_package))
 
     def test_wheel_audit_accepts_directory_entries_and_rejects_payload_changes(
         self,

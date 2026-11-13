@@ -1,13 +1,17 @@
 # Releasing
 
-The [release workflow](../.github/workflows/release.yaml) builds, tests, and
+The [Release workflow](../.github/workflows/release.yaml) validates, builds, and
 publishes the distribution archives. Start it through **Actions -> Release ->
-Run workflow** from `main`. The default `rehearsal` mode builds and tests
-without publishing. The `publish` mode also creates `v<version>` for the tested
-commit and publishes after registry environment approval. Maintainers review the
-source, release notes, platform limits, and completed artifacts before
-approving. The version comes from the committed package metadata; the workflow
-does not change versions or commit source files.
+Run workflow** from `main`. It calls [Checks](../.github/workflows/checks.yaml)
+with the complete release matrix, attests the resulting bundle, creates
+`v<version>` for the tested commit, and waits for registry environment
+approvals. Maintainers review the source, release notes, platform limits, and
+completed artifacts before approving publication of those exact archives.
+
+The version comes from the committed package metadata; the workflow does not
+change versions or commit source files. Leave `bootstrap` unchecked for trusted
+publishing. Check it when new crates.io or npm packages require temporary secret
+tokens.
 
 ## Names and prerequisites
 
@@ -100,18 +104,21 @@ artifacts to be rebuilt and checked before publication.
    run remains associated with `main` even after it creates the version tag.
 4. In **Settings -> Rules -> Rulesets**, create an active branch ruleset named
    `main-review` targeting `main`. Require a pull request with one maintainer
-   approval and the `Checks` workflow's `Audit dependencies`,
-   `Check and test (ubuntu-24.04-arm)`, and `Check and test (macos-15)` jobs.
-   Add **Repository administrators** to its bypass list with **Always allow** to
+   approval, squash merging, and the `Checks passed` status from the `Checks`
+   workflow. Require branches to be up to date before merging. The aggregate job
+   requires every selected audit, test, and distribution check to succeed; a
+   failed, canceled, or unexpectedly skipped check cannot pass it. Add
+   **Repository administrators** to its bypass list with **Always allow** to
    preserve maintainer direct pushes after local checks. Release runs still
    require their own complete checks before publishing.
 5. Create a separate active branch ruleset named `main-history` targeting
    `main`, with **Block force pushes** and **Restrict deletions**, and no bypass
    actors. This keeps history protection independent of maintainer direct
    pushes.
-6. Create an active tag ruleset targeting `v*`. Enable **Restrict updates** and
-   **Restrict deletions**. Leave tag creation allowed so the workflow's built-in
-   token can create release tags. Keep its bypass list empty.
+6. Create an active tag ruleset named `release-tags` targeting `v*`. Enable
+   **Restrict updates** and **Restrict deletions**. Leave tag creation allowed
+   so the workflow's built-in token can create release tags. Keep its bypass
+   list empty.
 7. In **Settings -> General -> Releases**, select **Enable release
    immutability**. The workflow attaches and verifies all assets while the
    release is a draft, then publishes it last.
@@ -120,11 +127,14 @@ See [GitHub environment setup][github-environments], [repository
 rulesets][github-rulesets], and [release immutability
 settings][github-immutable-releases] for the corresponding GitHub controls.
 
-## Registry setup for the first publication
+## Registry setup
 
-The first npm and crates.io uploads run in GitHub Actions using temporary API
-tokens. Select `bootstrap` only for this publication. Normal runs use trusted
-publishing and never fall back to stored tokens.
+New npm and crates.io packages can require temporary API tokens for their first
+upload. Select `bootstrap` to use `CARGO_REGISTRY_TOKEN` and `NPM_TOKEN` from
+their protected GitHub environments. This checkbox also supports introducing a
+new package in a later release. Both registry jobs use secret tokens when it is
+selected, so provide credentials for both. Normal runs use trusted publishing
+and never fall back to stored tokens.
 
 Use accounts with verified email addresses and two-factor authentication. On
 npm, create or obtain publishing access to the `@mikrio` scope. A GitHub
@@ -168,42 +178,50 @@ project already belongs to the publishing account, add the same trusted
 publisher in the project's settings instead. See [PyPI pending
 publishers][pypi-pending-publishers].
 
-## Rehearse and release
+## Release
 
 1. Commit the reviewed version change, changelog entry, and supporting changes.
-   Run **Actions -> Release -> Run workflow**, select branch `main`, leave
-   `mode` at `rehearsal`, and leave `bootstrap` unchecked.
-2. Inspect the completed run and download its `release-<version>` artifact. It
+   Run **Actions -> Release -> Run workflow** and select branch `main`. Leave
+   `bootstrap` unchecked unless new registry packages require temporary secret
+   tokens.
+2. Checks audits dependencies, then runs source tests and distribution builds
+   concurrently. Each target's native archives are built once and exercised by
+   installed consumers. Additional runtime jobs test those same archives. Source
+   package consumers validate the Rust archives and a wheel built from the
+   Python sdist. Assembly requires every selected check to succeed.
+3. Download the `release-<version>` artifact linked in the run summary. It
    contains the packages, `release.json`, `publish-order.json`, reviewed release
    notes, and `SHA256SUMS`. Review test results, dependency audits, licenses,
-   and support claims.
-3. Run the workflow again from `main` with `mode` set to `publish`. Check
-   `bootstrap` for the first npm and crates.io publication; otherwise leave it
-   unchecked. The workflow repeats checks and builds, attests the resulting
-   bundle, and creates `v<version>` at the tested commit. Do not create the tag
-   or GitHub Release manually. Tag pushes do not start this workflow.
-4. Download and inspect the **publishing run's** artifact. In the run's **Review
-   deployments** panel, approve `crates-io`, `npm`, and `pypi` when ready.
-   Approvals release those exact archives for publication.
-5. The workflow publishes Rust dependencies in order, npm native packages before
-   their wrapper, and the complete Python distribution set. Registry jobs use
-   trusted publishing unless bootstrap tokens were explicitly selected for npm
-   and crates.io. They do not compile or execute package contents.
-6. Separate jobs verify registry hashes and ordinary Rust, Python, and npm
+   and support claims. The workflow attests the bundle and creates `v<version>`
+   at the tested commit. Do not create the tag or GitHub Release manually. Tag
+   pushes do not start this workflow.
+4. In the run's **Review deployments** panel, approve `crates-io`, `npm`, and
+   `pypi` when ready. Approvals release the tested archives for publication
+   without another build. Registry jobs publish Rust dependencies in order, npm
+   native packages before their wrapper, and the complete Python distribution
+   set. They do not compile or execute package contents.
+5. Separate jobs verify registry hashes and ordinary Rust, Python, and npm
    installations on Linux arm64 and macOS arm64. GitHub release assets are
    uploaded and verified while the release is a draft; the release becomes
    public only after these checks succeed.
 
 The native matrix builds and runs installed Python, Node.js, C/C++, and CLI
-checks on macOS arm64/x86_64, Linux arm64/x86_64, and Windows x86_64. Linux
-builds use digest-pinned manylinux 2.28 containers. Additional installed-package
-jobs reuse those archives on macOS arm64 and Linux arm64 to cover Node.js
-22/24/26 and Python 3.13/3.14/3.15 before assembly. Wheel auditing must preserve
-the native files and shared SQLite identity; an audit that requires rewriting
-them fails. The sdist is independently built into a wheel and tested. Existing
-repository checks run through [checks.yaml](../.github/workflows/checks.yaml),
-including fresh Rust, Node.js, and Python dependency audits. These automated
-checks do not replace release-specific testing or review of executable
+checks on macOS arm64/x86_64, Linux arm64/x86_64, and Windows x86_64. Unix
+targets also exercise the attachment example and independent Go C consumer.
+Linux builds use digest-pinned manylinux 2.28 containers. Additional
+installed-package jobs reuse the archives on macOS arm64 and Linux arm64 to
+cover Node.js 22/24/26 and Python 3.13/3.14/3.15 before assembly. Wheel auditing
+must preserve the native files and shared SQLite identity; an audit that
+requires rewriting them fails.
+
+For validation without publication, run **Actions -> Checks -> Run workflow**
+with **Build and validate the complete release bundle** selected. This performs
+the same validation and assembly, with read-only repository permissions and no
+registry credentials, tags, or publication. It is useful when developing build
+tooling; a release itself runs all of these checks before requesting approval.
+
+Every release includes fresh Rust, Node.js, and Python dependency audits. These
+automated checks do not replace release-specific testing or review of executable
 dependencies.
 
 Actions are pinned to reviewed commits, build inputs remain locked, and new
@@ -246,9 +264,9 @@ disallow tokens** package setting. crates.io also supports requiring trusted
 publishing for future uploads. PyPI converts the pending publisher
 automatically.
 
-For subsequent releases, commit the new version and changelog, then run
-`publish` with `bootstrap` unchecked. No local publishing commands, manually
-created tags, or stored publishing tokens are required. See [npm trusted
+For subsequent releases, commit the new version and changelog, then run Release
+with `bootstrap` unchecked. No local publishing commands, manually created tags,
+or stored publishing tokens are required. See [npm trusted
 publishers][npm-trusted-publishers] and [crates.io trusted
 publishing][crates-io-trusted-publishing].
 
@@ -261,7 +279,8 @@ download and preserve the final bundle before beginning publication.
 
 A new publishing run refuses an existing version tag. If credentials or
 environment settings were wrong, correct those settings and rerun the original
-run's failed jobs. The original run retains its mode, commit, and artifact ID.
+run's failed jobs. The original run retains its bootstrap selection, commit, and
+artifact ID.
 
 Each publisher compares existing registry hashes and uploads only missing files.
 A mismatch stops the release. An interrupted upload is not automatically

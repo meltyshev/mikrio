@@ -1,0 +1,19 @@
+name: Set up Node.js and pnpm
+description: Install the pinned Node.js and pnpm versions
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 26.13.0
+        package-manager-cache: false
+
+    - name: Set up pnpm
+      shell: bash
+      run: |
+        package_manager=$(node -p 'require("./package.json").packageManager')
+        npm install --global --ignore-scripts "$package_manager"
+        # Activate the native binary with pnpm's reviewed setup hook.
+        node "$(npm root --global)/pnpm/install.js"

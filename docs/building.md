@@ -7,11 +7,12 @@ dependencies are locked in `packages/python/uv.lock`. A C compiler and the
 platform SDK are required for native builds. End users of wheels and native npm
 packages do not need Rust.
 
-CI runs dependency checks on each change, release rehearsal, and publication,
-and weekly on `main`. These use cargo-deny 0.20.2 for Rust advisories, licenses,
-and sources, pnpm audit for both JavaScript lockfiles, and the locked pip-audit
-version for the Python contributor and SDK graphs. Audit failures block release
-assembly; dependency upgrades and exceptions still require maintainer review.
+The Checks workflow runs dependency audits on each change, each complete release
+validation, and weekly on `main`. These use cargo-deny 0.20.2 for Rust
+advisories, licenses, and sources, pnpm audit for both JavaScript lockfiles, and
+the locked pip-audit version for the Python contributor and SDK graphs. Audit
+failures block release assembly; dependency upgrades and exceptions still
+require maintainer review.
 
 Run `python3 -m tools.dependencies` before compiling a changed Rust graph. It
 verifies registry checksums, release ages, and yanks for both Cargo lockfiles.
@@ -21,6 +22,20 @@ locked installs with dependency scripts and Python source builds disabled.
 Enable Renovate for the repository using `.github/renovate.json`. It groups
 routine update proposals weekly with the same three-day delay and no automatic
 merging. Security fixes are proposed separately for maintainer review.
+
+After the dependency audit, source linting, Rust tests, tooling/SDK tests, and
+native distribution builds run independently. Formatting and
+platform-independent linting run once. Linux arm64 and macOS arm64 each run the
+core Rust tests and the remaining workspace in separate jobs, retaining serial
+test execution within each job. Both feature configurations, Clippy, rustdoc,
+tooling, and SDK coverage remain required. `Checks passed` is the required
+aggregate status.
+
+Release calls Checks with its `release` input enabled. This adds source
+archives, all five native targets, additional runtime tests, and final bundle
+assembly. The same input is available on manual Checks runs for validation
+without publishing. See the [release guide](releasing.md) for approvals and
+publication.
 
 ## Setup
 
@@ -48,15 +63,16 @@ c++ -std=c++20 -Wall -Wextra -Werror -pthread -fsyntax-only \
   -I crates/mikrio-ffi/include tests/ffi/layout.cpp
 ```
 
-CI runs these checks before toolchain setup on Linux and macOS. They require
-only the checked-in headers and platform compilers. The installed consumer tests
-below separately verify linking and runtime behavior against the C distribution.
-After dependency audits, a separate Windows job builds and tests all native
-distributions, including these installed C consumers, alongside the Linux and
-macOS suites. It uses the same native build and test command as the release job.
+CI runs these checks before toolchain setup in each Unix native job. They
+require only the checked-in headers and platform compilers. The installed
+consumer tests below separately verify linking and runtime behavior against the
+C distribution. The shared native matrix builds and tests CLI, C, Node.js, and
+Python distributions on Linux arm64, macOS arm64, and Windows x86_64 for every
+change. Complete release validation adds Linux x86_64 and macOS x86_64. Linux
+packages are built and tested in the pinned manylinux 2.28 containers.
 
-The C administration harness also has subprocess protocol tests. Windows runs
-them before compiling the distribution so pipe failures surface early.
+The C administration harness also has subprocess protocol tests. Each native job
+runs them before compiling the distributions so pipe failures surface early.
 
 ```sh
 python3 -m unittest discover -s tests/ffi
@@ -175,7 +191,9 @@ from the registry.
 used by the release workflow. Use `native --target macos-arm64` (or another
 native target name from the support guide) for CLI, C, Node.js, and Python
 archives, or `sources` for Rust archives and the Python sdist. Select an empty
-directory with `--output`; these commands build and test without publishing.
+directory with `--output`; these commands build and test without publishing. On
+Unix, add `--go go --attachments` to exercise the independent Go C consumer and
+the installed Node.js attachment example against those same archives.
 
 For a complete local Windows check, use the pinned tool versions listed above
 and an x64 MSVC developer shell with `cl`, `link`, and `dumpbin` on `PATH`. Run
@@ -190,9 +208,8 @@ uv run --project packages/python --no-sync python -m tools.build_release native 
 ```
 
 This builds CLI, C, Node.js, and Python archives and tests their installed
-contents. A successful compile alone does not complete this check. The Windows
-job in Checks runs the same coverage before the release workflow's native-build
-stage.
+contents. A successful compile alone does not complete this check. Checks uses
+this same command for the Windows target in ordinary and release validation.
 
 Verify the maintained S3 templates with
 `python3 -m tools.regenerate_s3s --check`. Omit `--check` to regenerate the

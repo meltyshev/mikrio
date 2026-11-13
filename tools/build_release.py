@@ -1,4 +1,4 @@
-"""Build and exercise release archives using the existing package tools."""
+"""Build and test release distributions using the package tools."""
 
 from __future__ import annotations
 
@@ -93,7 +93,9 @@ def audit_linux_wheel(path: Path, target: str) -> Path:
     return destination
 
 
-def build_native(target: str, destination: Path) -> None:
+def build_native(
+    target: str, destination: Path, *, go: str | None = None, attachments: bool = False
+) -> None:
     version = check()
 
     npm = "npm.cmd" if os.name == "nt" else "npm"
@@ -124,6 +126,7 @@ def build_native(target: str, destination: Path) -> None:
     )
 
     invoke("tools.test_bindings", "python", str(wheel))
+
     public_package = destination / archive_name(PUBLIC_PACKAGE_NAME, version)
 
     native_package = destination / archive_name(
@@ -143,7 +146,21 @@ def build_native(target: str, destination: Path) -> None:
         npm,
     )
 
-    invoke("tools.test_ffi", str(destination / f"mikrio-c-{version}-{target}.tar.gz"))
+    if attachments:
+        invoke(
+            "tools.test_bindings",
+            "attachments",
+            str(public_package),
+            "--native",
+            str(native_package),
+        )
+
+    invoke(
+        "tools.test_ffi",
+        str(destination / f"mikrio-c-{version}-{target}.tar.gz"),
+        *(["--go", go] if go else []),
+    )
+
     archive = destination / f"mikrio-cli-{version}-{target}.tar.gz"
     test_cli(archive, target, version)
 
@@ -204,6 +221,7 @@ def build_sources(destination: Path) -> None:
     # Existing maintained crate versions retain their original registry bytes.
     invoke("tools.publish", "reuse-crates", str(destination))
     invoke("tools.test_rust", str(destination))
+
     invoke("tools.build", "sdist", "--output", str(destination))
     sdist = destination / f"mikrio-{check()}.tar.gz"
     read_tar_members(sdist)
@@ -249,7 +267,24 @@ def main() -> None:
     parser.add_argument("kind", choices=("native", "sources"))
     parser.add_argument("--target", choices=tuple(TARGETS))
     parser.add_argument("--output", type=Path, default=ROOT / "dist")
+
+    parser.add_argument(
+        "--go", help="Also test the native C archive with this Go executable"
+    )
+
+    parser.add_argument(
+        "--attachments",
+        action="store_true",
+        help="Also test the installed Node.js attachment example",
+    )
+
     arguments = parser.parse_args()
+
+    if arguments.kind == "sources" and (
+        arguments.target or arguments.go or arguments.attachments
+    ):
+        parser.error("source builds do not accept native target or consumer options")
+
     destination = arguments.output.resolve()
 
     if destination.exists() and any(destination.iterdir()):
@@ -260,7 +295,12 @@ def main() -> None:
     if arguments.kind == "sources":
         build_sources(destination)
     elif arguments.target:
-        build_native(arguments.target, destination)
+        build_native(
+            arguments.target,
+            destination,
+            go=arguments.go,
+            attachments=arguments.attachments,
+        )
     else:
         parser.error("native builds require --target")
 
