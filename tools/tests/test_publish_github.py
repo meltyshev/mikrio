@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from tools import publish_github
@@ -146,16 +147,151 @@ class GithubPublishTests(unittest.TestCase):
             run.assert_not_called()
             read.assert_not_called()
 
-    def test_draft_lookup_includes_later_pages(self) -> None:
-        draft = {"tag_name": "v0.1.0", "draft": True, "id": 42}
-        pages = [[{"tag_name": "v0.0.9", "draft": False}], [draft]]
+    def test_lookup_distinguishes_missing_draft_and_published_releases(self) -> None:
+        for release in (
+            None,
+            {"tag_name": "v0.1.0", "draft": True, "id": 42},
+            {"tag_name": "v0.1.0", "draft": False, "id": 42},
+        ):
+            reference = None if release is None else {"databaseId": 42}
+            response = {"data": {"repository": {"release": reference}}}
+
+            with (
+                self.subTest(release=release),
+                patch(
+                    "tools.publish_github.subprocess.check_output",
+                    side_effect=[json.dumps(response), json.dumps(release)],
+                ),
+            ):
+                self.assertEqual(publish_github.find_release("v0.1.0"), release)
+
+    def test_lookup_errors_cannot_create_a_release(self) -> None:
+        response = json.dumps({"data": {"repository": {"release": {"databaseId": 42}}}})
+
+        for stage in ("graphql", "rest"):
+            error = subprocess.CalledProcessError(1, "gh api")
+            responses = [error] if stage == "graphql" else [response, error]
+
+            with (
+                self.subTest(stage=stage),
+                patch.object(publish_github, "verify"),
+                patch.object(publish_github, "check", return_value="0.1.0"),
+                patch.object(publish_github, "verify_tag"),
+                patch(
+                    "tools.publish_github.subprocess.check_output",
+                    side_effect=responses,
+                ),
+                patch("tools.publish_github.subprocess.run") as run,
+            ):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    publish_github.publish(Path("release"))
+
+                run.assert_not_called()
+
+    def test_lookup_rejects_a_release_for_a_different_tag(self) -> None:
+        response = {"data": {"repository": {"release": {"databaseId": 42}}}}
+        release = {"tag_name": "v0.1.00", "draft": True, "id": 42}
 
         with patch(
             "tools.publish_github.subprocess.check_output",
-            return_value=json.dumps(pages),
+            side_effect=[json.dumps(response), json.dumps(release)],
         ):
-            self.assertEqual(publish_github.find_release("v0.1.0"), draft)
-            self.assertIsNone(publish_github.find_release("v0.2.0"))
+            with self.assertRaisesRegex(ValueError, "requested tag"):
+                publish_github.find_release("v0.1.0")
+
+    def test_new_draft_is_published_while_release_listings_lag(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "archive.tgz").write_bytes(b"reviewed archive")
+
+            (directory / "release-notes.md").write_text(
+                "Reviewed notes\n", encoding="utf-8", newline="\n"
+            )
+
+            release: dict[str, Any] = {
+                "id": 42,
+                "tag_name": "v0.1.0",
+                "draft": True,
+                "assets": [],
+                "body": "Reviewed notes",
+            }
+
+            created = False
+            mutations: list[str] = []
+
+            def read(command: list[str], *, encoding: str) -> str:
+                self.assertEqual(command[:2], ["gh", "api"])
+                endpoint = command[2]
+
+                if endpoint == "graphql":
+                    self.assertIn("owner=meltyshev", command)
+                    self.assertIn("name=mikrio", command)
+                    self.assertIn("tag=v0.1.0", command)
+                    reference = {"databaseId": 42} if created else None
+
+                    return json.dumps({"data": {"repository": {"release": reference}}})
+
+                if endpoint == f"repos/{REPOSITORY}/releases?per_page=100":
+                    return "[[]]"
+
+                if endpoint == f"repos/{REPOSITORY}/git/ref/tags/v0.1.0":
+                    return json.dumps({"object": {"type": "commit", "sha": "reviewed"}})
+
+                if endpoint == f"repos/{REPOSITORY}/releases/42" and created:
+                    return json.dumps(release)
+
+                raise AssertionError(f"unexpected API request: {command}")
+
+            def run(command: list[str], *, check: bool) -> None:
+                nonlocal created
+                self.assertEqual(command[:2], ["gh", "release"])
+                self.assertEqual(command[3], "v0.1.0")
+                self.assertEqual(command[-2:], ["--repo", REPOSITORY])
+                action = command[2]
+
+                if action == "create":
+                    self.assertFalse(created)
+                    self.assertIn("--draft", command)
+                    created = True
+                elif action == "upload":
+                    self.assertTrue(created)
+                    self.assertTrue(release["draft"])
+                    path = Path(command[4])
+
+                    release["assets"].append(
+                        {
+                            "name": path.name,
+                            "state": "uploaded",
+                            "digest": "sha256:" + digest(path),
+                        }
+                    )
+                elif action == "edit":
+                    self.assertEqual(
+                        {asset["name"] for asset in release["assets"]},
+                        {"archive.tgz", "release-notes.md"},
+                    )
+
+                    self.assertIn("--draft=false", command)
+                    release["draft"] = False
+                else:
+                    raise AssertionError(f"unexpected release command: {command}")
+
+                mutations.append(action)
+
+            with (
+                patch.object(publish_github, "verify"),
+                patch.object(publish_github, "check", return_value="0.1.0"),
+                patch.object(
+                    publish_github, "source_revision", return_value="reviewed"
+                ),
+                patch("tools.publish_github.subprocess.check_output", side_effect=read),
+                patch("tools.publish_github.subprocess.run", side_effect=run),
+            ):
+                publish_github.publish(directory)
+                publish_github.publish(directory)
+
+            self.assertFalse(release["draft"])
+            self.assertEqual(mutations, ["create", "upload", "upload", "edit"])
 
     def test_resuming_a_draft_uploads_only_missing_assets_before_publication(
         self,

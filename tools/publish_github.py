@@ -28,29 +28,48 @@ def run_release_command(*arguments: str) -> None:
 
 
 def find_release(tag: str) -> dict[str, Any] | None:
-    # The tag endpoint finds published releases only. Authenticated listings
-    # include drafts, including an earlier interrupted publication.
-    pages = json.loads(
+    # Direct GraphQL lookup includes pending draft tags without the replication
+    # lag of REST release listings: https://github.com/cli/cli/issues/6599.
+    owner, name = REPOSITORY.split("/", 1)
+
+    query = """
+        query($owner: String!, $name: String!, $tag: String!) {
+            repository(owner: $owner, name: $name) {
+                release(tagName: $tag) { databaseId }
+            }
+        }
+    """
+
+    response = json.loads(
         subprocess.check_output(
             [
                 "gh",
                 "api",
-                f"repos/{REPOSITORY}/releases?per_page=100",
-                "--paginate",
-                "--slurp",
+                "graphql",
+                "--raw-field",
+                "query=" + query,
+                "--raw-field",
+                "owner=" + owner,
+                "--raw-field",
+                "name=" + name,
+                "--raw-field",
+                "tag=" + tag,
             ],
             encoding="utf-8",
         )
     )
 
-    matches = [
-        release for page in pages for release in page if release["tag_name"] == tag
-    ]
+    reference = response["data"]["repository"]["release"]
 
-    if len(matches) > 1:
-        raise ValueError("multiple GitHub releases use the release tag")
+    if reference is None:
+        return None
 
-    return matches[0] if matches else None
+    release = read_api(f"releases/{reference['databaseId']}")
+
+    if release["tag_name"] != tag:
+        raise ValueError("GitHub release differs from the requested tag")
+
+    return release
 
 
 def create_tag(directory: Path) -> None:
