@@ -716,6 +716,11 @@ await test(
     );
 
     const controller = new AbortController();
+    controller.signal.addEventListener(
+      "abort",
+      (event) => event.stopImmediatePropagation(),
+      { once: true },
+    );
     const started = performance.now();
 
     const waiting = Store.open(

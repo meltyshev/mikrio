@@ -87,7 +87,7 @@ import {
   storageError,
 } from "./errors.cjs";
 import { loadNative, type NativeStore } from "./native.cjs";
-import { Call, callSignal, invoke } from "./calls.cjs";
+import { Call, invoke } from "./calls.cjs";
 import {
   tags,
   bucketInput,
@@ -185,16 +185,8 @@ export class Store {
     callOptions?: CallOptions,
   ): Promise<Store> {
     const { directory, region, createIfMissing } = openOptions(options);
-    const signal = callSignal(callOptions);
-
-    if (signal?.aborted) {
-      throw canceled(signal);
-    }
-
-    const native = loadNative();
-    const cancellation = new native.NativeCancellation();
-    const onAbort = (): void => cancellation.cancel();
-    signal?.addEventListener("abort", onAbort, { once: true });
+    const call = new Call(callOptions, false);
+    const { signal, cancellation } = call;
 
     try {
       // Recheck after registration so a signal cannot be missed during setup.
@@ -202,7 +194,7 @@ export class Store {
         throw canceled(signal);
       }
 
-      const store = await native.open(
+      const store = await loadNative().open(
         directory,
         region,
         createIfMissing ?? true,
@@ -239,7 +231,7 @@ export class Store {
 
       throw translated;
     } finally {
-      signal?.removeEventListener("abort", onAbort);
+      call.close();
     }
   }
 

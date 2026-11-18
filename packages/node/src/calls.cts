@@ -1,9 +1,10 @@
+import { addAbortListener } from "node:events";
 import { canceled, storageError, StorageError } from "./errors.cjs";
 import { record } from "./inputs.cjs";
 import { loadNative, type NativeCancellation } from "./native.cjs";
 import type { CallOptions } from "./index.cjs";
 
-export function callSignal(value: unknown): AbortSignal | undefined {
+function callSignal(value: unknown): AbortSignal | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -21,6 +22,7 @@ export function callSignal(value: unknown): AbortSignal | undefined {
 export class Call {
   readonly cancellation: NativeCancellation;
   readonly signal: AbortSignal | undefined;
+  readonly #abortListener: Disposable | undefined;
   #onCancel: (() => void) | undefined;
 
   readonly #abort = (): void => {
@@ -36,7 +38,10 @@ export class Call {
     }
 
     this.cancellation = new (loadNative().NativeCancellation)();
-    this.signal?.addEventListener("abort", this.#abort, { once: true });
+
+    if (this.signal !== undefined) {
+      this.#abortListener = addAbortListener(this.signal, this.#abort);
+    }
 
     if (this.signal?.aborted) {
       this.#abort();
@@ -52,7 +57,7 @@ export class Call {
   }
 
   close(): void {
-    this.signal?.removeEventListener("abort", this.#abort);
+    this.#abortListener?.[Symbol.dispose]();
     this.#onCancel = undefined;
   }
 }

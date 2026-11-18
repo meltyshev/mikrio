@@ -901,6 +901,13 @@ await test("objects: GET signal stays attached through the body and detaches at 
   assert.equal(await body.readChunk({ maxBytes: 1 }), null);
 
   const next = new AbortController();
+  next.signal.addEventListener(
+    "abort",
+    (event) => event.stopImmediatePropagation(),
+    {
+      once: true,
+    },
+  );
 
   await using selected = (
     await store.getObject(
