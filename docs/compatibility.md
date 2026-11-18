@@ -85,11 +85,11 @@ incomplete-multipart abort days, or both. It does not support arbitrary S3
 filters, storage-class transitions, or versioned-object actions. Reopening a
 store resumes retention using original ages.
 
-For both actions, mikrio adds the configured number of 24-hour days to the
-stored object age anchor or upload initiation time, then selects the first UTC
-midnight strictly after that instant. This establishes eligibility; bounded
-maintenance and active readers can delay cleanup. Changing a rule does not reset
-the object's or upload's age.
+For each action, mikrio uses the shortest duration among matching enabled rules.
+It adds that number of 24-hour days to the stored object age anchor or upload
+initiation time, then selects the first UTC midnight strictly after that
+instant. Bounded maintenance and active readers can delay cleanup past that
+deadline. Changing a rule does not reset the object's or upload's age.
 
 ## Access and browsers
 
