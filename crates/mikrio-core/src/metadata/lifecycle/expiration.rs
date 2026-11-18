@@ -168,32 +168,15 @@ fn eligible(
     selected: &Candidate,
     now: EpochMillis,
 ) -> Result<bool, OperationError> {
-    let mut earliest: Option<EpochMillis> = None;
+    let Some(days) =
+        rules.shortest_matching_days(selected.key.as_str(), |rule| rule.expiration_days)
+    else {
+        return Ok(false);
+    };
 
-    for rule in rules.rules() {
-        if !rule.is_enabled {
-            continue;
-        }
-
-        if !selected
-            .key
-            .as_bytes()
-            .starts_with(rule.filter.prefix().as_bytes())
-        {
-            continue;
-        }
-
-        let Some(days) = rule.expiration_days else {
-            continue;
-        };
-
-        let deadline = expiration_at(selected.anchor, days)
-            .map_err(|error| OperationError::caused(OperationFailure::InvalidArgument, error))?;
-
-        earliest = Some(earliest.map_or(deadline, |current| current.min(deadline)));
-    }
-
-    Ok(earliest.is_some_and(|deadline| now >= deadline))
+    let deadline = expiration_at(selected.anchor, days)
+        .map_err(|error| OperationError::caused(OperationFailure::InvalidArgument, error))?;
+    Ok(now >= deadline)
 }
 
 fn corrupt() -> OperationError {

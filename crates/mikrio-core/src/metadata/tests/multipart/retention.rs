@@ -110,6 +110,44 @@ fn lifecycle_upload_retirement_requires_current_rules_identity_and_original_age(
 }
 
 #[test]
+fn earliest_matching_abort_rule_controls_upload_retirement() -> TestResult {
+    let directory = TestDirectory::new()?.retain_on_failure();
+    let mut database = initialized(&directory)?;
+    let input = request();
+    database.initiate_multipart(
+        &Authority::Native,
+        &input,
+        UploadId::new(EpochMillis::new(0)?, [1; 16]),
+    )?;
+
+    let rules = [2_147_483_647, 1].map(|days| LifecycleRule {
+        id: None,
+        is_enabled: true,
+        filter: LifecycleFilter::All,
+        expiration_days: None,
+        abort_incomplete_multipart_days: Some(days),
+    });
+
+    database.put_bucket_lifecycle(
+        &Authority::Native,
+        &BucketAccessRequest {
+            bucket: input.bucket,
+            expected_owner: None,
+        },
+        &LifecycleConfiguration::new(rules.into())?,
+    )?;
+
+    let due = EpochMillis::new(172_800_000)?;
+    assert!(candidate(&mut database, EpochMillis::new(due.get() - 1)?)?.is_none());
+    let selected = candidate(&mut database, due)?.unwrap();
+    database.expire_upload(&selected, due)?;
+    assert_eq!(count(&database)?, 0);
+    close(database)?;
+    directory.finish()?;
+    Ok(())
+}
+
+#[test]
 fn lifecycle_upload_pages_bound_raw_work_and_survive_deleted_upper_rows_and_stale_cursors()
 -> TestResult {
     let directory = TestDirectory::new()?.retain_on_failure();

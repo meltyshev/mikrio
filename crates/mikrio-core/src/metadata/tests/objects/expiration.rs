@@ -182,6 +182,7 @@ fn current_clock_and_earliest_matching_rule_control_a_single_logical_deletion() 
     for (index, (prefix, days, enabled)) in [
         ("", 8, true),
         ("literal/", 1, true),
+        ("", 2_147_483_647, true),
         ("literal/key", 2, false),
     ]
     .into_iter()
@@ -364,7 +365,7 @@ fn invalid_eligibility_or_corrupt_blob_preserves_mapping_and_retirement_hint() -
     let (mut database, request) = setup(&directory)?;
     let blob = publish(&mut database, &request, 0)?;
     let mut configured = rules("", 2_147_483_647, true).into_rules();
-    let mut valid = rules("literal/", 1, true).into_rules().remove(0);
+    let mut valid = rules("elsewhere/", 1, true).into_rules().remove(0);
     valid.id = Some("valid".into());
     configured.push(valid);
 

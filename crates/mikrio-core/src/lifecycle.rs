@@ -110,6 +110,20 @@ impl LifecycleConfiguration {
         &self.0
     }
 
+    // Matching rules share one age anchor. Only the shortest duration needs
+    // a representable deadline.
+    pub(crate) fn shortest_matching_days(
+        &self,
+        key: &str,
+        days: impl Fn(&LifecycleRule) -> Option<u32>,
+    ) -> Option<u32> {
+        self.0
+            .iter()
+            .filter(|rule| rule.is_enabled && key.starts_with(rule.filter.prefix()))
+            .filter_map(days)
+            .min()
+    }
+
     #[must_use]
     pub fn into_rules(self) -> Vec<LifecycleRule> {
         self.0
