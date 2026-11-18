@@ -1,4 +1,4 @@
-> mikrio-maintained distribution `mikrio-s3s` (0.17.0-mikrio.1). Based on
+> mikrio-maintained distribution `mikrio-s3s` (0.17.0-mikrio.2). Based on
 > upstream `s3s` 0.17.0; the upstream text and attribution follow. This package
 > is an internal implementation dependency, not a supported mikrio API. See
 > [maintained dependencies][maintained-dependencies] for the patch description

@@ -117,15 +117,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
-name = "chrono"
-version = "0.4.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "cmov"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -690,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "mikrio-s3s"
-version = "0.17.0-mikrio.1"
+version = "0.17.0-mikrio.2"
 dependencies = [
  "arc-swap",
  "arrayvec",
@@ -700,7 +691,6 @@ dependencies = [
  "bytes",
  "bytestring",
  "cfg-if",
- "chrono",
  "crc-fast",
  "futures",
  "hex-simd",

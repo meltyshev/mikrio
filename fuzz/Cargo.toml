@@ -18,7 +18,7 @@ base64-simd = { version = "=0.8.0", default-features = false, features = ["detec
 bytes = { version = "=1.12.1", default-features = false, features = ["std"] }
 futures-util = { version = "=0.3.34", default-features = false, features = ["std"] }
 libfuzzer-sys = "=0.4.13"
-s3s = { package = "mikrio-s3s", version = "=0.17.0-mikrio.1", path = "../vendor/s3s-0.17.0", default-features = false }
+s3s = { package = "mikrio-s3s", version = "=0.17.0-mikrio.2", path = "../vendor/s3s-0.17.0", default-features = false }
 
 [[bin]]
 name = "multipart"

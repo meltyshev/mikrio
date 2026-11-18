@@ -3,7 +3,7 @@
 edition = "2024"
 rust-version = "1.96.0"
 name = "mikrio-s3s"
-version = "0.17.0-mikrio.1"
+version = "0.17.0-mikrio.2"
 exclude = ["Cargo.toml.orig"]
 build = false
 autolib = false
@@ -95,10 +95,6 @@ version = "1.5.1"
 
 [dependencies.cfg-if]
 version = "1.0.4"
-
-[dependencies.chrono]
-version = "0.4.45"
-default-features = false
 
 [dependencies.crc-fast]
 version = "1.10.0"

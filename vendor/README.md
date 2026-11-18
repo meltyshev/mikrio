@@ -18,10 +18,10 @@ texts, upstream manifests, and upstream source attribution are retained.
 - **`mikrio-rusqlite`** (rusqlite 0.41.1): Select the maintained SQLite
   dependency.
 
-The versions retain the upstream base with the `-mikrio.1` suffix. They are
-separate from the coordinated project version. `Cargo.toml.orig` preserves the
-upstream-oriented manifest; each maintained manifest declares its upstream name
-and version under `package.metadata.mikrio`.
+The versions retain the upstream base with a numbered `-mikrio.N` suffix. They
+are separate from the coordinated project version. `Cargo.toml.orig` preserves
+the upstream-oriented manifest; each maintained manifest declares its upstream
+name and version under `package.metadata.mikrio`.
 
 Keep changes small and preserve unrelated upstream source and formatting. Review
 upstream security updates under their original identities. Remove a maintained
