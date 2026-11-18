@@ -139,6 +139,12 @@ pub(super) fn begin(
 
 impl MetadataDatabase {
     pub(crate) fn advance_sweep(&mut self, progress: Progress) -> Result<(), OperationError> {
+        // An already-empty sweep has no progress to persist. The next page
+        // still checks the source for newly inserted rows.
+        if progress.expected.upper == 0 && progress.upper == 0 {
+            return Ok(());
+        }
+
         let (name, shard) = progress.task.identity();
 
         let generation = progress

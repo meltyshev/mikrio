@@ -152,6 +152,13 @@ fn lifecycle_upload_pages_bound_raw_work_and_survive_deleted_upper_rows_and_stal
 -> TestResult {
     let directory = TestDirectory::new()?.retain_on_failure();
     let mut database = initialized(&directory)?;
+    configure(&mut database, true, "no-match/")?;
+    let now = EpochMillis::new(172_800_000)?;
+    let before = database.connection.total_changes();
+    let empty = database.upload_expiration_page(now)?.unwrap();
+    database.advance_sweep(empty.progress)?;
+    assert_eq!(database.connection.total_changes(), before);
+
     let mut uploads = Vec::new();
 
     for suffix in 1..=17 {
@@ -160,8 +167,6 @@ fn lifecycle_upload_pages_bound_raw_work_and_survive_deleted_upper_rows_and_stal
         uploads.push(upload_id);
     }
 
-    configure(&mut database, true, "no-match/")?;
-    let now = EpochMillis::new(172_800_000)?;
     let first = database.upload_expiration_page(now)?.unwrap();
     assert_eq!(first.candidates.len(), 16);
 

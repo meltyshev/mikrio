@@ -547,10 +547,16 @@ fn raw_pages_finish_the_captured_bound_and_revisit_replacements_and_new_rows() -
     let directory = TestDirectory::new()?.retain_on_failure();
     let (mut database, request) = setup(&directory)?;
     database.put_bucket_lifecycle(&Authority::Native, &bucket(&request), &rules("", 1, true))?;
-    let empty = database.object_expiration_page(clock(DUE))?.unwrap();
-    assert_eq!(empty.candidates.len(), 0);
-    assert_eq!(empty.progress.upper, 0);
-    database.advance_sweep(empty.progress)?;
+    let before = database.connection.total_changes();
+
+    for _ in 0..2 {
+        let empty = database.object_expiration_page(clock(DUE))?.unwrap();
+        assert!(empty.candidates.is_empty());
+        assert_eq!(empty.progress.upper, 0);
+        database.advance_sweep(empty.progress)?;
+    }
+
+    assert_eq!(database.connection.total_changes(), before);
     let mut requests = Vec::new();
 
     for index in 0..32 {
