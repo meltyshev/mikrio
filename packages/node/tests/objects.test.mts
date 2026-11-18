@@ -762,6 +762,20 @@ await test("objects: mutable large chunks drain before next pull and empty chunk
   assert.deepEqual(actual.slice(400_000), new Uint8Array(400_000).fill(2));
 });
 
+await test("objects: transferring a pending upload buffer preserves the predecessor", async (context) => {
+  const { store } = await fixture(context);
+  const object = { bucket: "bucket", key: "key" };
+  await store.putObject({ ...object, body: Uint8Array.of(9) });
+
+  const bytes = Uint8Array.of(1, 2, 3);
+  const pending = store.putObject({ ...object, body: bytes });
+  structuredClone(bytes.buffer, { transfer: [bytes.buffer] });
+
+  await assert.rejects(pending, code("BodyReadFailed", "NotCommitted"));
+  await using body = (await store.getObject(object)).body;
+  assert.deepEqual(await body.readAll({ maxBytes: 1 }), Buffer.from([9]));
+});
+
 await test("objects: source failure keeps its cause and the predecessor", async (context) => {
   const { store } = await fixture(context);
   const cause = new Error("controlled producer failure");

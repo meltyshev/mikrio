@@ -183,6 +183,7 @@ async function pump(
 ): Promise<void> {
   let iterator: AsyncIterator<Uint8Array> | undefined;
   let chunk: Uint8Array | undefined;
+  let chunkLength = 0;
   let offset = 0;
   let producerFinished = false;
   let request: NativeRequest | undefined;
@@ -191,6 +192,7 @@ async function pump(
   try {
     if (isUint8Array(source)) {
       chunk = byteView(source);
+      chunkLength = chunk.byteLength;
     } else {
       iterator = source[Symbol.asyncIterator]();
     }
@@ -204,7 +206,8 @@ async function pump(
         return;
       }
 
-      while (chunk === undefined || offset === chunk.byteLength) {
+      // A transfer can zero the view's live length while native demand is pending.
+      while (chunk === undefined || offset === chunkLength) {
         if (state.hasSettled) {
           return;
         }
@@ -249,10 +252,11 @@ async function pump(
         }
 
         chunk = byteView(next.value);
+        chunkLength = chunk.byteLength;
         offset = 0;
         isProducerCall = false;
 
-        if (chunk.byteLength === 0) {
+        if (chunkLength === 0) {
           await yieldTurn();
         }
       }
@@ -261,11 +265,15 @@ async function pump(
         return;
       }
 
-      const end = Math.min(offset + CHUNK_BYTES, chunk.byteLength);
+      const end = Math.min(offset + CHUNK_BYTES, chunkLength);
 
       // The fresh non-shared buffer also makes SharedArrayBuffer-backed input
       // safe to lend to Rust; no concurrently writable foreign memory is borrowed.
       isProducerCall = true;
+      if (chunk.byteLength !== chunkLength) {
+        throw new TypeError("body chunk changed length before it was consumed");
+      }
+
       const bytes = new Uint8Array(chunk.subarray(offset, end));
       isProducerCall = false;
       request.write(bytes);
