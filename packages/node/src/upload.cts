@@ -230,16 +230,13 @@ async function pump(
           throw new TypeError("body iterator must return an object");
         }
 
-        const hasInvalidDone =
-          "done" in next &&
-          next.done !== undefined &&
-          typeof next.done !== "boolean";
+        const done = "done" in next ? next.done : undefined;
 
-        if (hasInvalidDone) {
+        if (done !== undefined && typeof done !== "boolean") {
           throw new TypeError("body iterator done must be boolean");
         }
 
-        if ("done" in next && next.done === true) {
+        if (done === true) {
           isProducerCall = false;
           request.finish();
           request = undefined;
@@ -247,11 +244,13 @@ async function pump(
           return;
         }
 
-        if (!("value" in next) || !isUint8Array(next.value)) {
+        const value = "value" in next ? next.value : undefined;
+
+        if (!isUint8Array(value)) {
           throw new TypeError("body chunks must be Uint8Array");
         }
 
-        chunk = byteView(next.value);
+        chunk = byteView(value);
         chunkLength = chunk.byteLength;
         offset = 0;
         isProducerCall = false;
