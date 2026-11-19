@@ -229,7 +229,7 @@ class ReleaseTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "receipt|platform metadata"):
                     release.inspect_npm(path, altered, "0.1.0")
 
-    def test_release_notes_select_the_exact_version(self) -> None:
+    def test_changelog_entry_selects_the_exact_version(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             changelog = root / "CHANGELOG.md"
@@ -246,10 +246,29 @@ class ReleaseTests(unittest.TestCase):
 
                     with patch.object(release, "ROOT", root):
                         self.assertEqual(
-                            release.release_notes("0.1.0"),
+                            release.changelog_entry("0.1.0"),
                             "Reviewed [support](https://github.com/"
                             "meltyshev/mikrio/blob/v0.1.0/SUPPORT.md).\n",
                         )
+
+    def test_release_notes_unwrap_markdown_prose(self) -> None:
+        hard_breaks_and_code = (
+            "Two spaces  \nnext line\\\nlast line.\n\n"
+            "```js\nconst x=1\nconst y=2\n```\n"
+        )
+        entry = (
+            "### Changes\n\nWrapped\nparagraph.\n\n"
+            "- Wrapped\n  item.\n  - Nested\n    item.\n- Another item.\n\n"
+            + hard_breaks_and_code
+        )
+
+        with patch.object(release, "changelog_entry", return_value=entry):
+            self.assertEqual(
+                release.release_notes("0.1.0"),
+                "### Changes\n\nWrapped paragraph.\n\n"
+                "- Wrapped item.\n  - Nested item.\n- Another item.\n\n"
+                + hard_breaks_and_code,
+            )
 
     def test_similar_versions_cannot_supply_missing_release_notes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -265,7 +284,7 @@ class ReleaseTests(unittest.TestCase):
                         patch.object(release, "ROOT", root),
                         self.assertRaisesRegex(ValueError, "missing release changelog"),
                     ):
-                        release.release_notes("0.1.0")
+                        release.changelog_entry("0.1.0")
 
     def test_changed_release_bytes_are_rejected_before_package_processing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -444,7 +463,7 @@ class ReleasePreflightTests(unittest.TestCase):
             patch.dict("os.environ", environment | changes),
             patch.object(release, "ROOT", self.root),
             patch.object(release, "check", return_value="0.1.0"),
-            patch.object(release, "release_notes"),
+            patch.object(release, "changelog_entry"),
             patch.object(release, "write_output") as output,
         ):
             if "RELEASE_BOOTSTRAP" not in changes:

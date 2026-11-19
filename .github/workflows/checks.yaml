@@ -549,6 +549,12 @@ jobs:
         id: version
         run: echo "version=$(python3 -m tools.version show)" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node
+
+      - name: Install Node.js dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Download native distributions
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

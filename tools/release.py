@@ -54,7 +54,7 @@ def source_revision() -> str:
     ).strip()
 
 
-def release_notes(version: str) -> str:
+def changelog_entry(version: str) -> str:
     text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     heading = rf"(?:\[{re.escape(version)}\]|{re.escape(version)})"
 
@@ -69,7 +69,7 @@ def release_notes(version: str) -> str:
 
     return (
         match[1]
-        .strip()
+        .strip("\n")
         .replace(
             "(SUPPORT.md)",
             f"(https://github.com/{REPOSITORY}/blob/v{version}/SUPPORT.md)",
@@ -78,9 +78,28 @@ def release_notes(version: str) -> str:
     )
 
 
+def release_notes(version: str) -> str:
+    """Unwrap Markdown prose for the GitHub release body."""
+    return subprocess.check_output(
+        [
+            "node",
+            "node_modules/prettier/bin/prettier.cjs",
+            "--parser",
+            "markdown",
+            "--prose-wrap",
+            "never",
+            "--embedded-language-formatting",
+            "off",
+        ],
+        cwd=ROOT,
+        input=changelog_entry(version),
+        encoding="utf-8",
+    )
+
+
 def preflight() -> None:
     version = check()
-    release_notes(version)
+    changelog_entry(version)
 
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT):
         raise ValueError("release preparation requires a clean checkout")
